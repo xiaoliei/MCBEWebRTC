@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "start": "node src/server.js",
+    "start:gateway": "node wss/main.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "uuid": "^13.0.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "@types/ws": "^8.18.1"
+  }
+}

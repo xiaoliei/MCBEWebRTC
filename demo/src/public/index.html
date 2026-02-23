@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>WebRTC Demo</title>
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+</head>
+<body>
+  <h1>WebRTC Demo</h1>
+
+  <section>
+    <label for="playerID-input">游戏ID（同名重连可用 “玩家名#校验码”）：</label>
+    <input id="playerID-input" type="text" value="Steve" autocomplete="off" />
+    <button id="connect-btn">开始语音通话</button>
+    <button id="leave-btn" disabled>退出语音通话</button>
+  </section>
+
+  <section>
+    <h2>附近玩家</h2>
+    <ul id="joined-players"></ul>
+  </section>
+
+  <section>
+    <h2>远端语音</h2>
+    <div id="remote-audios"></div>
+  </section>
+
+  <pre id="log"></pre>
+
+  <script>
+    const connectButton = document.getElementById('connect-btn');
+    const leaveButton = document.getElementById('leave-btn');
+    const playerInput = document.getElementById('playerID-input');
+    const joinedPlayersList = document.getElementById('joined-players');
+    const logEl = document.getElementById('log');
+    const remoteAudios = document.getElementById('remote-audios');
+
+    const DEFAULT_ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+    let iceServers = DEFAULT_ICE_SERVERS;
+
+    let ws;
+    let connected = false;
+    let localStream;
+
+    let selfSessionId = '';
+    let selfPlayerName = '';
+
+    // remoteSessionId -> { pc, playerName }
+    const peerConnections = new Map();
+
+    connectButton.addEventListener('click', async () => {
+      if (connected) return;
+
+      const parsed = parsePlayerInput(playerInput.value);
+      if (!parsed.playerName) {
+        appendLog('请先输入游戏ID');
+        return;
+      }
+
+      selfPlayerName = parsed.playerName;
+      try {
+        await ensureLocalStream();
+      } catch (err) {
+        appendLog('无法访问麦克风，请检查权限设置');
+        console.error(err);
+        return;
+      }
+
+      await loadIceServers();
+
+      ws = new WebSocket(`ws://${location.hostname}:3000/ws`);
+
+      ws.addEventListener('open', () => {
+        appendLog('已连接至信令服务器');
+        safeSend(ws, {
+          type: 'connect',
+          playerName: parsed.playerName,
+          code: parsed.code || '',
+        });
+      });
+
+      ws.addEventListener('message', (event) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          appendLog('收到无效 JSON');
+          return;
+        }
+
+        switch (msg.type) {
+          case 'connected': {
+            connected = true;
+            connectButton.disabled = true;
+            leaveButton.disabled = false;
+            selfSessionId = msg?.data?.sessionId || '';
+            selfPlayerName = msg?.data?.playerName || selfPlayerName;
+            appendLog(`已接入：${selfPlayerName} (${selfSessionId})`);
+            safeSend(ws, { type: 'getAllPlayers' });
+            break;
+          }
+          case 'connectDenied': {
+            appendLog(`连接被拒绝：${msg?.reason || 'unknown'}`);
+            if (msg?.needVerification) {
+              appendLog(msg?.hint || '同名在线：请关闭旧连接，或使用校验码重连');
+              appendLog(msg?.toldInGame ? '已尝试在游戏内发送校验码' : '未连接网关，无法游戏内发送校验码');
+            }
+            break;
+          }
+          case 'nearbyPlayers': {
+            updateNearbyPlayers(msg.data);
+            break;
+          }
+          case 'webrtc.offer': {
+            handleOffer(msg?.data);
+            break;
+          }
+          case 'webrtc.answer': {
+            handleAnswer(msg?.data);
+            break;
+          }
+          case 'webrtc.candidate': {
+            handleCandidate(msg?.data);
+            break;
+          }
+          case 'allPlayers': {
+            const names = Array.isArray(msg.data) ? msg.data.map((p) => p.playerName).join(', ') : '';
+            appendLog(`在线：${names}`);
+            break;
+          }
+          default:
+            appendLog(`收到消息：${JSON.stringify(msg)}`);
+        }
+      });
+
+      ws.addEventListener('close', () => {
+        appendLog('连接已关闭');
+        connected = false;
+        selfSessionId = '';
+        selfPlayerName = '';
+        connectButton.disabled = false;
+        leaveButton.disabled = true;
+        joinedPlayersList.innerHTML = '';
+        cleanupAllPeers();
+        stopLocalStream();
+      });
+
+      ws.addEventListener('error', () => {
+        appendLog('WebSocket 发生错误');
+      });
+    });
+
+    leaveButton.addEventListener('click', () => {
+      try { ws?.close(); } catch { /* ignore */ }
+    });
+
+    function parsePlayerInput(raw) {
+      const text = String(raw || '').trim();
+      if (!text) return { playerName: '', code: '' };
+      const match = text.match(/^(.+?)(?:#|:|：)(\d{4,8})$/);
+      if (!match) return { playerName: text, code: '' };
+      return { playerName: match[1].trim(), code: match[2] };
+    }
+
+    async function loadIceServers() {
+      try {
+        const res = await fetch('/api/ice');
+        const json = await res.json();
+        if (Array.isArray(json?.iceServers) && json.iceServers.length) {
+          iceServers = json.iceServers;
+          appendLog(`ICE 已加载：${iceServers.map((s) => s.urls).flat().join(', ')}`);
+        }
+      } catch {
+        iceServers = DEFAULT_ICE_SERVERS;
+      }
+    }
+
+    function updateNearbyPlayers(players) {
+      const nearby = Array.isArray(players) ? players : [];
+
+      if (!nearby.length) {
+        joinedPlayersList.innerHTML = '<li>没有附近玩家</li>';
+      } else {
+        joinedPlayersList.innerHTML = '';
+        nearby.forEach((player) => {
+          const li = document.createElement('li');
+          const pos = player.position || { x: 0, y: 0, z: 0 };
+          li.textContent = `${player.playerName} (${player.sessionId}) (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)})`;
+          joinedPlayersList.appendChild(li);
+        });
+      }
+
+      const nearbyIds = new Set(nearby.map((p) => p.sessionId).filter(Boolean));
+      for (const sessionId of Array.from(peerConnections.keys())) {
+        if (!nearbyIds.has(sessionId)) cleanupPeer(sessionId);
+      }
+
+      nearby.forEach((player) => {
+        if (shouldInitiateCall(player.sessionId)) initiateCall(player.sessionId, player.playerName);
+      });
+    }
+
+    function shouldInitiateCall(targetSessionId) {
+      return Boolean(
+        connected &&
+        selfSessionId &&
+        targetSessionId &&
+        targetSessionId !== selfSessionId &&
+        !peerConnections.has(targetSessionId) &&
+        selfSessionId < targetSessionId
+      );
+    }
+
+    async function initiateCall(targetSessionId, targetName) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!localStream) {
+        appendLog('本地音频流尚未准备，无法呼叫');
+        return;
+      }
+
+      const pc = createPeerConnection(targetSessionId, targetName);
+      peerConnections.set(targetSessionId, { pc, playerName: targetName || '' });
+
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        safeSend(ws, {
+          type: 'webrtc.offer',
+          data: {
+            targetSessionId,
+            payload: pc.localDescription
+          }
+        });
+      } catch (err) {
+        appendLog(`无法呼叫 ${targetName || targetSessionId}`);
+        console.error(err);
+        cleanupPeer(targetSessionId);
+      }
+    }
+
+    function createPeerConnection(targetSessionId, targetName) {
+      const pc = new RTCPeerConnection({ iceServers });
+
+      attachLocalTracks(pc);
+      pc.addEventListener('track', (event) => handleRemoteStream(targetSessionId, targetName, event.streams[0]));
+
+      pc.addEventListener('icecandidate', (event) => {
+        if (!event.candidate) return;
+        safeSend(ws, {
+          type: 'webrtc.candidate',
+          data: {
+            targetSessionId,
+            payload: event.candidate
+          }
+        });
+      });
+
+      pc.addEventListener('iceconnectionstatechange', () => {
+        if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) cleanupPeer(targetSessionId);
+      });
+
+      return pc;
+    }
+
+    function attachLocalTracks(pc) {
+      if (!localStream) return;
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+    }
+
+    function handleRemoteStream(targetSessionId, targetName, stream) {
+      if (!stream) return;
+      let audio = remoteAudios.querySelector(`audio[data-session="${targetSessionId}"]`);
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.autoplay = true;
+        audio.controls = false;
+        audio.dataset.session = targetSessionId;
+        audio.title = targetName || targetSessionId;
+        audio.style.display = 'none';
+        audio.muted = false;
+        audio.setAttribute('playsinline', '');
+        remoteAudios.appendChild(audio);
+      }
+      audio.srcObject = stream;
+    }
+
+    function cleanupPeer(targetSessionId) {
+      const entry = peerConnections.get(targetSessionId);
+      if (entry?.pc) {
+        try { entry.pc.close(); } catch { /* ignore */ }
+      }
+      peerConnections.delete(targetSessionId);
+
+      const audio = remoteAudios.querySelector(`audio[data-session="${targetSessionId}"]`);
+      if (audio) {
+        audio.srcObject = null;
+        audio.remove();
+      }
+    }
+
+    function cleanupAllPeers() {
+      Array.from(peerConnections.keys()).forEach(cleanupPeer);
+    }
+
+    async function handleOffer(data) {
+      const fromSessionId = data?.fromSessionId;
+      const fromPlayerName = data?.fromPlayerName || '';
+      const offer = data?.payload;
+      if (!fromSessionId || !offer) return;
+
+      let entry = peerConnections.get(fromSessionId);
+      if (!entry) {
+        const pc = createPeerConnection(fromSessionId, fromPlayerName);
+        entry = { pc, playerName: fromPlayerName };
+        peerConnections.set(fromSessionId, entry);
+      }
+
+      try {
+        await entry.pc.setRemoteDescription(offer);
+        const answer = await entry.pc.createAnswer();
+        await entry.pc.setLocalDescription(answer);
+        safeSend(ws, {
+          type: 'webrtc.answer',
+          data: {
+            targetSessionId: fromSessionId,
+            payload: entry.pc.localDescription
+          }
+        });
+      } catch (err) {
+        appendLog(`处理 ${fromPlayerName || fromSessionId} 的呼叫失败`);
+        console.error(err);
+        cleanupPeer(fromSessionId);
+      }
+    }
+
+    async function handleAnswer(data) {
+      const fromSessionId = data?.fromSessionId;
+      const answer = data?.payload;
+      if (!fromSessionId || !answer) return;
+      const entry = peerConnections.get(fromSessionId);
+      if (!entry) return;
+      try {
+        await entry.pc.setRemoteDescription(answer);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function handleCandidate(data) {
+      const fromSessionId = data?.fromSessionId;
+      const candidate = data?.payload;
+      if (!fromSessionId || !candidate) return;
+      const entry = peerConnections.get(fromSessionId);
+      if (!entry) return;
+      try {
+        await entry.pc.addIceCandidate(candidate);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function appendLog(message) {
+      logEl.textContent += `${new Date().toLocaleTimeString()} - ${message}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function safeSend(target, message) {
+      try {
+        target.send(JSON.stringify(message));
+      } catch (err) {
+        console.error('Failed to send message:', err.message);
+      }
+    }
+
+    async function ensureLocalStream() {
+      if (localStream) return localStream;
+      localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      return localStream;
+    }
+
+    function stopLocalStream() {
+      if (!localStream) return;
+      localStream.getTracks().forEach((track) => track.stop());
+      localStream = null;
+    }
+  </script>
+</body>
+</html>
