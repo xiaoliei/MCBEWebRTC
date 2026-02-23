@@ -1,0 +1,17 @@
+{
+  "name": "@mcbewss/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "25.3.0",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  }
+}
