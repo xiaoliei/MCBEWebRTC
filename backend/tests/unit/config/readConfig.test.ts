@@ -2,17 +2,6 @@ import { describe, expect, it } from "vitest";
 import { readConfig } from "../../../src/config/readConfig.js";
 
 describe("readConfig", () => {
-  it("在未提供环境变量时返回默认配置", () => {
-    const config = readConfig({});
-
-    expect(config.port).toBe(3000);
-    expect(config.host).toBe("0.0.0.0");
-    expect(config.bridgeToken).toBe("replace-with-strong-token");
-    expect(config.iceServers).toEqual([
-      { urls: "stun:stun.l.google.com:19302" },
-    ]);
-  });
-
   it("解析自定义环境变量并读取 ICE 服务器列表", () => {
     const config = readConfig({
       PORT: "4567",
@@ -35,13 +24,23 @@ describe("readConfig", () => {
   });
 
   it("当 PORT 非法时回退到默认端口", () => {
-    const config = readConfig({ PORT: "0" });
+    const config = readConfig({ PORT: "0", BRIDGE_TOKEN: "test-token" });
     expect(config.port).toBe(3000);
   });
 
   it("当 ICE_SERVERS 非法 JSON 时抛出错误", () => {
-    expect(() => readConfig({ ICE_SERVERS: "{bad-json}" })).toThrowError(
-      /ICE_SERVERS/i,
-    );
+    expect(() =>
+      readConfig({ ICE_SERVERS: "{bad-json}", BRIDGE_TOKEN: "test-token" })
+    ).toThrowError(/ICE_SERVERS/i);
+  });
+
+  it("当 BRIDGE_TOKEN 未设置时抛出错误", () => {
+    expect(() => readConfig({})).toThrowError(/BRIDGE_TOKEN.*环境变量未设置/);
+  });
+
+  it("当 BRIDGE_TOKEN 使用占位符时抛出错误", () => {
+    expect(() =>
+      readConfig({ BRIDGE_TOKEN: "CHANGE_ME_IN_PRODUCTION" })
+    ).toThrowError(/BRIDGE_TOKEN.*占位符/);
   });
 });

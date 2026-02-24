@@ -1,27 +1,53 @@
-import { io } from 'socket.io-client';
+import { io, type Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
   ServerToClientEvents
 } from '../../../shared/src/types/signaling.js';
 import type { SocketGateway } from './SocketGateway';
 
+/**
+ * SocketLike 接口定义了我们需要使用的 Socket.io 子集
+ * 这样可以在测试中轻松 mock，而不需要完整的 Socket.io 实现
+ */
 interface SocketLike {
   connect(): void;
   disconnect(): void;
   on(event: string, handler: (payload?: unknown) => void): void;
-  off(event: string, handler: (payload?: unknown) => void): void;
+  off(event: string, handler?: (payload?: unknown) => void): void;
   emit(event: string, payload?: unknown): void;
+  readonly connected: boolean;
+}
+
+/**
+ * 将 Socket.io Socket 对象适配为 SocketLike 接口
+ */
+function adaptSocketToSocketLike(socket: Socket): SocketLike {
+  return {
+    connect: () => socket.connect(),
+    disconnect: () => socket.disconnect(),
+    on: (event, handler) => socket.on(event, handler),
+    off: (event, handler) => socket.off(event, handler),
+    emit: (event, payload) => socket.emit(event, payload),
+    get connected() {
+      return socket.connected;
+    }
+  };
 }
 
 export function createSocketGateway(
   createClient?: () => SocketLike
 ): SocketGateway {
+  const backendUrl = String(import.meta.env.VITE_BACKEND_URL ?? '').trim();
+
   const client: SocketLike =
     createClient?.() ??
-    (io({
-      autoConnect: false,
-      transports: ['websocket']
-    }) as unknown as SocketLike);
+    adaptSocketToSocketLike(
+      io(backendUrl || undefined, {
+        path: '/socket.io',
+        autoConnect: false,
+        transports: ['websocket']
+      })
+    );
 
   return {
     connect() {

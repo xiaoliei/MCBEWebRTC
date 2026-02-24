@@ -58,15 +58,37 @@ function parseIceServers(rawIceServers: string | undefined): IceServerDto[] {
   }
 }
 
+function parseBridgeToken(rawToken: string | undefined): string {
+  const token = rawToken?.trim();
+  if (!token) {
+    throw new Error(
+      "BRIDGE_TOKEN 环境变量未设置,请设置为强随机字符串用于网关鉴权"
+    );
+  }
+
+  // 检测常见占位符,避免生产环境误用不安全的默认值
+  const placeholders = [
+    "replace-with-strong-token",
+    "your-secure-random-token-here",
+    "change_me_in_production",
+  ];
+  const lowerToken = token.toLowerCase();
+  if (placeholders.some((p) => lowerToken === p.toLowerCase())) {
+    throw new Error(
+      `BRIDGE_TOKEN 使用了占位符 "${token}",请设置为强随机字符串用于生产环境`
+    );
+  }
+
+  return token;
+}
+
 export function readConfig(
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): AppConfig {
-  const bridgeToken = env.BRIDGE_TOKEN?.trim() || "replace-with-strong-token";
-
   return {
     port: parsePort(env.PORT),
     host: env.HOST?.trim() || "0.0.0.0",
-    bridgeToken,
+    bridgeToken: parseBridgeToken(env.BRIDGE_TOKEN),
     iceServers: parseIceServers(env.ICE_SERVERS),
   };
 }

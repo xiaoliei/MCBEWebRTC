@@ -6,7 +6,8 @@ interface MockSocket {
   disconnect: () => void;
   emit: (event: string, payload?: unknown) => void;
   on: (event: string, handler: (payload?: unknown) => void) => void;
-  off: (event: string, handler: (payload?: unknown) => void) => void;
+  off: (event: string, handler?: (payload?: unknown) => void) => void;
+  connected: boolean;
 }
 
 function createMockSocket(): MockSocket {
@@ -15,7 +16,8 @@ function createMockSocket(): MockSocket {
     disconnect: vi.fn(),
     emit: vi.fn(),
     on: vi.fn(),
-    off: vi.fn()
+    off: vi.fn(),
+    connected: false
   };
 }
 

@@ -1,0 +1,32 @@
+{
+  "name": "@mcbewss/mcwss",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write ."
+  },
+  "dependencies": {
+    "@mcbewss/shared": "file:../shared",
+    "socket.io-client": "4.8.3",
+    "uuid": "13.0.0",
+    "ws": "8.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@types/node": "25.3.0",
+    "@types/ws": "8.18.1",
+    "eslint": "9.39.1",
+    "globals": "17.3.0",
+    "prettier": "3.8.1",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.56.1",
+    "vitest": "4.0.18"
+  }
+}
