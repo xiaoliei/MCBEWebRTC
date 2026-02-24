@@ -1,6 +1,7 @@
-import { readConfig } from './config/readConfig.js';
-import { McGateway } from './mcGateway.js';
-import { SignalingBridge } from './signalingBridge.js';
+import "dotenv/config";
+import { readConfig } from "./config/readConfig.js";
+import { McGateway } from "./mcGateway.js";
+import { SignalingBridge } from "./signalingBridge.js";
 
 const config = readConfig();
 

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import http from "node:http";
 import { readConfig } from "./config/readConfig.js";
 import { ReconnectCodeStore } from "./domain/session/ReconnectCodeStore.js";
