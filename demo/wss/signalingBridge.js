@@ -9,8 +9,8 @@
  * - 发出连接状态事件
  */
 
-const EventEmitter = require('events');
-const { WebSocket } = require('ws');
+const EventEmitter = require("events");
+const { WebSocket } = require("ws");
 
 class SignalingBridge extends EventEmitter {
   /**
@@ -27,10 +27,10 @@ class SignalingBridge extends EventEmitter {
     this.token = token;
     this.debug = debug;
 
-    this.socket = null;  // WebSocket 连接实例
-    this._stopped = false;  // 是否已停止
-    this._reconnectDelayMs = 500;  // 重连延迟（毫秒）
-    this._reconnectTimer = null;  // 重连定时器
+    this.socket = null; // WebSocket 连接实例
+    this._stopped = false; // 是否已停止
+    this._reconnectDelayMs = 500; // 重连延迟（毫秒）
+    this._reconnectTimer = null; // 重连定时器
   }
 
   /**
@@ -77,7 +77,7 @@ class SignalingBridge extends EventEmitter {
     try {
       socket.send(
         JSON.stringify({
-          type: 'positionUpdate',
+          type: "positionUpdate",
           playerName,
           playerId,
           position,
@@ -102,7 +102,10 @@ class SignalingBridge extends EventEmitter {
     if (this._stopped) return;
     if (this._reconnectTimer) return;
     const delay = this._reconnectDelayMs;
-    this._reconnectDelayMs = Math.min(5000, Math.floor(this._reconnectDelayMs * 1.5));
+    this._reconnectDelayMs = Math.min(
+      5000,
+      Math.floor(this._reconnectDelayMs * 1.5),
+    );
 
     if (this.debug) console.log(`[bridge] reconnect in ${delay}ms`);
     this._reconnectTimer = setTimeout(() => {
@@ -124,15 +127,15 @@ class SignalingBridge extends EventEmitter {
     this.socket = socket;
 
     // 连接成功
-    socket.on('open', () => {
-      this._reconnectDelayMs = 500;  // 重置重连延迟
-      if (this.debug) console.log('[bridge] connected');
-      this._sendAuth();  // 发送认证
-      this.emit('connected');  // 发出连接成功事件
+    socket.on("open", () => {
+      this._reconnectDelayMs = 500; // 重置重连延迟
+      if (this.debug) console.log("[bridge] connected");
+      this._sendAuth(); // 发送认证
+      this.emit("connected"); // 发出连接成功事件
     });
 
     // 接收消息
-    socket.on('message', (raw) => {
+    socket.on("message", (raw) => {
       let msg;
       try {
         msg = JSON.parse(raw.toString());
@@ -140,22 +143,22 @@ class SignalingBridge extends EventEmitter {
         return;
       }
       // 处理游戏内命令
-      if (msg?.type === 'mc.command') {
+      if (msg?.type === "mc.command") {
         const commandLine = msg?.data?.commandLine;
         const originType = msg?.data?.originType;
-        if (commandLine) this.emit('mcCommand', { commandLine, originType });
+        if (commandLine) this.emit("mcCommand", { commandLine, originType });
       }
     });
 
     // 连接关闭
-    socket.on('close', () => {
-      if (this.debug) console.log('[bridge] disconnected');
-      this.emit('disconnected');  // 发出断开连接事件
-      this._scheduleReconnect();  // 安排重连
+    socket.on("close", () => {
+      if (this.debug) console.log("[bridge] disconnected");
+      this.emit("disconnected"); // 发出断开连接事件
+      this._scheduleReconnect(); // 安排重连
     });
 
     // 连接错误
-    socket.on('error', (err) => {
+    socket.on("error", (err) => {
       if (this.debug) console.log(`[bridge] error: ${err?.message || err}`);
     });
   }
@@ -170,7 +173,7 @@ class SignalingBridge extends EventEmitter {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(
       JSON.stringify({
-        type: 'authenticate',
+        type: "authenticate",
         token: this.token,
       }),
     );
@@ -180,4 +183,3 @@ class SignalingBridge extends EventEmitter {
 module.exports = {
   SignalingBridge,
 };
-

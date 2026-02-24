@@ -9,9 +9,9 @@
  * - 处理优雅关闭
  */
 
-const { readConfig } = require('./config');
-const { SignalingBridge } = require('./signalingBridge');
-const { McGateway } = require('./mcGateway');
+const { readConfig } = require("./config");
+const { SignalingBridge } = require("./signalingBridge");
+const { McGateway } = require("./mcGateway");
 
 // 读取配置
 const config = readConfig();
@@ -49,9 +49,10 @@ const mc = new McGateway({
  * 当主服务器需要向游戏内发送命令（如 tell 命令）时，
  * 通过此事件接收并转发到 Minecraft 游戏服务器。
  */
-bridge.on('mcCommand', ({ commandLine, originType }) => {
+bridge.on("mcCommand", ({ commandLine, originType }) => {
   const ok = mc.sendCommand({ commandLine, originType });
-  if (config.debug) console.log(`[mc.command] ${ok ? 'sent' : 'failed'}: ${commandLine}`);
+  if (config.debug)
+    console.log(`[mc.command] ${ok ? "sent" : "failed"}: ${commandLine}`);
 });
 
 // 启动信令桥接器和 Minecraft 网关
@@ -63,8 +64,8 @@ mc.start();
  *
  * 当收到 SIGINT 信号（Ctrl+C）时，停止所有服务并退出进程。
  */
-process.on('SIGINT', () => {
-  console.log('Shutting down...');
+process.on("SIGINT", () => {
+  console.log("Shutting down...");
   try {
     bridge.stop();
     mc.stop();
@@ -72,4 +73,3 @@ process.on('SIGINT', () => {
     process.exit(0);
   }
 });
-

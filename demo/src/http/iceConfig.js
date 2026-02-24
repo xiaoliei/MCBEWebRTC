@@ -52,17 +52,17 @@ function getIceServersFromEnv() {
   const servers = [];
 
   // 配置 STUN 服务器
-  const stunUrls = (process.env.STUN_URLS || 'stun:stun.l.google.com:19302')
-    .split(',')
+  const stunUrls = (process.env.STUN_URLS || "stun:stun.l.google.com:19302")
+    .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
   if (stunUrls.length) servers.push({ urls: stunUrls });
 
   // 配置 TURN 服务器
-  const turnUrl = (process.env.TURN_URL || '').trim();
+  const turnUrl = (process.env.TURN_URL || "").trim();
   if (turnUrl) {
-    const username = process.env.TURN_USERNAME || '';
-    const credential = process.env.TURN_CREDENTIAL || '';
+    const username = process.env.TURN_USERNAME || "";
+    const credential = process.env.TURN_CREDENTIAL || "";
     servers.push({
       urls: [turnUrl],
       username,
@@ -76,4 +76,3 @@ function getIceServersFromEnv() {
 module.exports = {
   getIceServersFromEnv,
 };
-

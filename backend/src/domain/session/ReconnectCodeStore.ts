@@ -26,7 +26,7 @@ export class ReconnectCodeStore {
 
     this.codeByPlayerName.set(playerName, {
       code: input.code.trim(),
-      expiresAt: input.expiresAt
+      expiresAt: input.expiresAt,
     });
   }
 

@@ -8,7 +8,7 @@
  * - 管理重连验证码
  */
 
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require("uuid");
 
 class State {
   constructor() {
@@ -65,7 +65,7 @@ class State {
    * @returns {Object|null} 更新后的玩家数据，如果玩家名称无效则返回 null
    */
   upsertGamePlayer({ playerName, position, dim, playerId, now }) {
-    const name = String(playerName || '').trim();
+    const name = String(playerName || "").trim();
     if (!name) return null;
 
     // 获取现有数据或创建新数据
@@ -78,7 +78,7 @@ class State {
     };
 
     // 更新字段（只更新提供的字段）
-    if (position && typeof position === 'object') current.position = position;
+    if (position && typeof position === "object") current.position = position;
     if (dim != null) current.dim = dim;
     if (playerId != null) current.playerId = playerId;
     current.lastSeenAt = now;
@@ -130,7 +130,7 @@ class State {
    * @returns {Object|null} 创建的会话对象，如果玩家名称无效则返回 null
    */
   createClientSession({ playerName, socket }) {
-    const name = String(playerName || '').trim();
+    const name = String(playerName || "").trim();
     if (!name) return null;
 
     // 生成唯一的会话 ID
@@ -165,7 +165,9 @@ class State {
    * @returns {string|null} 会话 ID，如果不存在则返回 null
    */
   getClientSessionIdByName(playerName) {
-    return this.clientSessionIdByName.get(String(playerName || '').trim()) || null;
+    return (
+      this.clientSessionIdByName.get(String(playerName || "").trim()) || null
+    );
   }
 
   /**
@@ -176,10 +178,10 @@ class State {
   removeClientSession(sessionId) {
     const session = this.clientSessionsById.get(sessionId);
     if (!session) return;
-    
+
     // 从主索引中删除
     this.clientSessionsById.delete(sessionId);
-    
+
     // 从名称索引中删除（仅当匹配时）
     const name = session.playerName;
     if (this.clientSessionIdByName.get(name) === sessionId) {
@@ -207,7 +209,7 @@ class State {
    * @param {number} expiresAt - 过期时间戳
    */
   setReconnectCode(playerName, code, expiresAt) {
-    const name = String(playerName || '').trim();
+    const name = String(playerName || "").trim();
     if (!name) return;
     this.pendingReconnectByName.set(name, { code, expiresAt });
   }
@@ -223,19 +225,19 @@ class State {
    * @returns {boolean} 验证是否成功
    */
   consumeReconnectCode(playerName, code, now) {
-    const name = String(playerName || '').trim();
+    const name = String(playerName || "").trim();
     const item = this.pendingReconnectByName.get(name);
     if (!item) return false;
-    
+
     // 检查是否过期
     if (now > item.expiresAt) {
       this.pendingReconnectByName.delete(name);
       return false;
     }
-    
+
     // 检查验证码是否匹配
-    if (String(code || '').trim() !== item.code) return false;
-    
+    if (String(code || "").trim() !== item.code) return false;
+
     // 验证成功，删除验证码
     this.pendingReconnectByName.delete(name);
     return true;
@@ -245,4 +247,3 @@ class State {
 module.exports = {
   State,
 };
-

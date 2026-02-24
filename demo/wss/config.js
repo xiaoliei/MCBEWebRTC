@@ -16,7 +16,7 @@
  */
 function parseIntEnv(name, fallback) {
   const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
+  if (raw == null || raw === "") return fallback;
   const value = Number.parseInt(raw, 10);
   return Number.isFinite(value) ? value : fallback;
 }
@@ -32,8 +32,8 @@ function parseIntEnv(name, fallback) {
  */
 function parseBoolEnv(name, fallback) {
   const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
-  return ['1', 'true', 'yes', 'on'].includes(String(raw).toLowerCase());
+  if (raw == null || raw === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(String(raw).toLowerCase());
 }
 
 /**
@@ -52,17 +52,16 @@ function parseBoolEnv(name, fallback) {
 function readConfig() {
   return {
     // 网关监听端口
-    port: parseIntEnv('GATEWAY_PORT', 8000),
+    port: parseIntEnv("GATEWAY_PORT", 8000),
     // 主服务器信令 URL
-    signalingUrl: process.env.SIGNALING_URL || 'ws://localhost:3000/ws',
+    signalingUrl: process.env.SIGNALING_URL || "ws://localhost:3000/ws",
     // 认证令牌（必须与主服务器配置一致）
-    mcToken: process.env.MCBEWSS_TOKEN || '',
+    mcToken: process.env.MCBEWSS_TOKEN || "",
     // 调试模式
-    debug: parseBoolEnv('DEBUG', false),
+    debug: parseBoolEnv("DEBUG", false),
   };
 }
 
 module.exports = {
   readConfig,
 };
-

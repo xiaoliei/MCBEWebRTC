@@ -16,7 +16,7 @@
  */
 function parseIntEnv(name, fallback) {
   const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
+  if (raw == null || raw === "") return fallback;
   const value = Number.parseInt(raw, 10);
   return Number.isFinite(value) ? value : fallback;
 }
@@ -30,7 +30,7 @@ function parseIntEnv(name, fallback) {
  */
 function parseFloatEnv(name, fallback) {
   const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
+  if (raw == null || raw === "") return fallback;
   const value = Number.parseFloat(raw);
   return Number.isFinite(value) ? value : fallback;
 }
@@ -46,8 +46,8 @@ function parseFloatEnv(name, fallback) {
  */
 function parseBoolEnv(name, fallback) {
   const raw = process.env[name];
-  if (raw == null || raw === '') return fallback;
-  return ['1', 'true', 'yes', 'on'].includes(String(raw).toLowerCase());
+  if (raw == null || raw === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(String(raw).toLowerCase());
 }
 
 /**
@@ -70,24 +70,23 @@ function parseBoolEnv(name, fallback) {
 function readConfig() {
   return {
     // HTTP 服务器配置
-    appPort: parseIntEnv('APP_PORT', 3000),
-    wsPath: process.env.WS_PATH || '/ws',
+    appPort: parseIntEnv("APP_PORT", 3000),
+    wsPath: process.env.WS_PATH || "/ws",
 
     // 邻近服务配置
-    callRadius: parseFloatEnv('CALL_RADIUS', 10),
-    proximityTickMs: parseIntEnv('PROXIMITY_TICK_MS', 250),
-    gamePlayerTtlMs: parseIntEnv('GAME_PLAYER_TTL_MS', 10_000),
+    callRadius: parseFloatEnv("CALL_RADIUS", 10),
+    proximityTickMs: parseIntEnv("PROXIMITY_TICK_MS", 250),
+    gamePlayerTtlMs: parseIntEnv("GAME_PLAYER_TTL_MS", 10_000),
 
     // 重连验证码配置
-    reconnectCodeTtlMs: parseIntEnv('RECONNECT_CODE_TTL_MS', 120_000),
+    reconnectCodeTtlMs: parseIntEnv("RECONNECT_CODE_TTL_MS", 120_000),
 
     // 认证和调试配置
-    mcToken: process.env.MCBEWSS_TOKEN || '',
-    debug: parseBoolEnv('DEBUG', false),
+    mcToken: process.env.MCBEWSS_TOKEN || "",
+    debug: parseBoolEnv("DEBUG", false),
   };
 }
 
 module.exports = {
   readConfig,
 };
-

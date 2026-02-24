@@ -10,8 +10,8 @@
  * 注意：同一时间只允许一个 Minecraft 连接，新连接会替换旧连接。
  */
 
-const { WebSocketServer } = require('ws');
-const { v4: uuidv4 } = require('uuid');
+const { WebSocketServer } = require("ws");
+const { v4: uuidv4 } = require("uuid");
 
 class McGateway {
   /**
@@ -27,8 +27,8 @@ class McGateway {
     this.debug = debug;
     this.onPlayerTransform = onPlayerTransform;
 
-    this.wss = null;  // WebSocket 服务器实例
-    this.mcSocket = null;  // 当前 Minecraft 连接
+    this.wss = null; // WebSocket 服务器实例
+    this.mcSocket = null; // 当前 Minecraft 连接
   }
 
   /**
@@ -41,11 +41,11 @@ class McGateway {
     console.log(`listening on port: ${this.port}`);
 
     // 处理新的连接
-    this.wss.on('connection', (socket) => {
+    this.wss.on("connection", (socket) => {
       // 如果已有连接，关闭旧连接
       if (this.mcSocket && this.mcSocket !== socket) {
         try {
-          this.mcSocket.close(4000, 'replaced');
+          this.mcSocket.close(4000, "replaced");
         } catch {
           // ignore
         }
@@ -53,13 +53,13 @@ class McGateway {
 
       // 设置新连接
       this.mcSocket = socket;
-      if (this.debug) console.log('[mc] connected');
+      if (this.debug) console.log("[mc] connected");
 
       // 订阅玩家位置变化事件
       this._subscribePlayerTransform(socket);
 
       // 处理接收到的消息
-      socket.on('message', (raw) => {
+      socket.on("message", (raw) => {
         let msg;
         try {
           msg = JSON.parse(raw.toString());
@@ -68,30 +68,32 @@ class McGateway {
         }
 
         // 只处理 PlayerTransform 事件
-        if (msg?.header?.eventName !== 'PlayerTransform') return;
-        
+        if (msg?.header?.eventName !== "PlayerTransform") return;
+
         // 提取玩家数据
         const player = msg?.body?.player;
         const playerName = player?.name;
         const position = player?.position;
         const dim = player?.dimension;
-        const playerId = player?.uniqueId ?? player?.id ?? player?.runtimeId ?? null;
+        const playerId =
+          player?.uniqueId ?? player?.id ?? player?.runtimeId ?? null;
 
         // 验证必要字段
         if (!playerName || !position) return;
-        
+
         // 触发回调函数
-        if (this.onPlayerTransform) this.onPlayerTransform({ playerName, playerId, position, dim });
+        if (this.onPlayerTransform)
+          this.onPlayerTransform({ playerName, playerId, position, dim });
       });
 
       // 处理连接关闭
-      socket.on('close', () => {
+      socket.on("close", () => {
         if (this.mcSocket === socket) this.mcSocket = null;
-        if (this.debug) console.log('[mc] disconnected');
+        if (this.debug) console.log("[mc] disconnected");
       });
 
       // 处理连接错误
-      socket.on('error', () => {
+      socket.on("error", () => {
         // ignore
       });
     });
@@ -118,7 +120,7 @@ class McGateway {
    * @param {string} params.originType - 命令来源类型（默认为 'player'）
    * @returns {boolean} 是否发送成功
    */
-  sendCommand({ commandLine, originType = 'player' }) {
+  sendCommand({ commandLine, originType = "player" }) {
     const socket = this.mcSocket;
     if (!socket) return false;
 
@@ -132,9 +134,9 @@ class McGateway {
           },
           header: {
             requestId: uuidv4(),
-            messagePurpose: 'commandRequest',
+            messagePurpose: "commandRequest",
             version: 1,
-            messageType: 'commandRequest',
+            messageType: "commandRequest",
           },
         }),
       );
@@ -159,11 +161,11 @@ class McGateway {
         header: {
           version: 1,
           requestId: uuidv4(),
-          messageType: 'commandRequest',
-          messagePurpose: 'subscribe',
+          messageType: "commandRequest",
+          messagePurpose: "subscribe",
         },
         body: {
-          eventName: 'PlayerTransform',
+          eventName: "PlayerTransform",
         },
       }),
     );
@@ -173,4 +175,3 @@ class McGateway {
 module.exports = {
   McGateway,
 };
-

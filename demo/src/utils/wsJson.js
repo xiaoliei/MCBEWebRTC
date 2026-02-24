@@ -6,7 +6,7 @@
  * - 安全的 WebSocket 消息发送（检查连接状态）
  */
 
-const { WebSocket } = require('ws');
+const { WebSocket } = require("ws");
 
 /**
  * 尝试解析 JSON 字符串
@@ -48,4 +48,3 @@ module.exports = {
   tryParseJson,
   safeSend,
 };
-

@@ -1,14 +1,14 @@
-import type http from 'node:http';
-import { Server } from 'socket.io';
-import { ReconnectCodeStore } from '../domain/session/ReconnectCodeStore.js';
-import { SessionStore } from '../domain/session/SessionStore.js';
-import { startProximityService } from '../domain/proximity/startProximityService.js';
-import { StateStore } from '../domain/state/StateStore.js';
-import { handleBridgePositionUpdate } from './handlers/bridgePosition.js';
-import { handleClientJoin } from './handlers/clientJoin.js';
-import { handlePresenceListReq } from './handlers/presence.js';
-import { handleWebRtcRelay } from './handlers/webrtcRelay.js';
-import { authBridge } from './middleware/authBridge.js';
+import type http from "node:http";
+import { Server } from "socket.io";
+import { ReconnectCodeStore } from "../domain/session/ReconnectCodeStore.js";
+import { SessionStore } from "../domain/session/SessionStore.js";
+import { startProximityService } from "../domain/proximity/startProximityService.js";
+import { StateStore } from "../domain/state/StateStore.js";
+import { handleBridgePositionUpdate } from "./handlers/bridgePosition.js";
+import { handleClientJoin } from "./handlers/clientJoin.js";
+import { handlePresenceListReq } from "./handlers/presence.js";
+import { handleWebRtcRelay } from "./handlers/webrtcRelay.js";
+import { authBridge } from "./middleware/authBridge.js";
 
 export interface SocketServerOptions {
   bridgeToken: string;
@@ -33,8 +33,8 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
   const io = new Server(input.httpServer, {
     cors: {
       origin: true,
-      credentials: true
-    }
+      credentials: true,
+    },
   });
 
   const socketIdBySessionId = new Map<string, string>();
@@ -50,36 +50,36 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
       if (!targetSocketId) {
         return;
       }
-      io.to(targetSocketId).emit('presence:nearby', { players: nearbyPlayers });
-    }
+      io.to(targetSocketId).emit("presence:nearby", { players: nearbyPlayers });
+    },
   });
 
-  io.on('connection', (socket) => {
+  io.on("connection", (socket) => {
     const bridgeAuth = authBridge(socket, input.options.bridgeToken);
     if (bridgeAuth.isBridge) {
       if (!bridgeAuth.authorized) {
-        socket.emit('auth:rejected', { reason: 'UNAUTHORIZED' });
+        socket.emit("auth:rejected", { reason: "UNAUTHORIZED" });
         socket.disconnect(true);
         return;
       }
 
-      socket.emit('auth:accepted');
-      socket.on('bridge:position:update', (payload) => {
+      socket.emit("auth:accepted");
+      socket.on("bridge:position:update", (payload) => {
         handleBridgePositionUpdate(payload, {
-          stateStore: input.stores.stateStore
+          stateStore: input.stores.stateStore,
         });
       });
       return;
     }
 
-    socket.on('client:join', (payload) => {
+    socket.on("client:join", (payload) => {
       const session = handleClientJoin(payload, {
         socketId: socket.id,
         sessionStore: input.stores.sessionStore,
         reconnectCodeStore: input.stores.reconnectCodeStore,
         emitSelf: (event, body) => {
           socket.emit(event, body);
-        }
+        },
       });
 
       if (!session) {
@@ -90,22 +90,28 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
       socketIdBySessionId.set(session.sessionId, socket.id);
     });
 
-    socket.on('webrtc:offer', (payload) => relayWebRtc(socket, 'webrtc:offer', payload));
-    socket.on('webrtc:answer', (payload) => relayWebRtc(socket, 'webrtc:answer', payload));
-    socket.on('webrtc:candidate', (payload) => relayWebRtc(socket, 'webrtc:candidate', payload));
+    socket.on("webrtc:offer", (payload) =>
+      relayWebRtc(socket, "webrtc:offer", payload),
+    );
+    socket.on("webrtc:answer", (payload) =>
+      relayWebRtc(socket, "webrtc:answer", payload),
+    );
+    socket.on("webrtc:candidate", (payload) =>
+      relayWebRtc(socket, "webrtc:candidate", payload),
+    );
 
-    socket.on('presence:list:req', () => {
-      const requestSessionId = String(socket.data.sessionId ?? '').trim();
+    socket.on("presence:list:req", () => {
+      const requestSessionId = String(socket.data.sessionId ?? "").trim();
       handlePresenceListReq({
         requestSessionId,
         sessionStore: input.stores.sessionStore,
         stateStore: input.stores.stateStore,
-        emitSelf: (event, body) => socket.emit(event, body)
+        emitSelf: (event, body) => socket.emit(event, body),
       });
     });
 
-    socket.on('disconnect', () => {
-      const sessionId = String(socket.data.sessionId ?? '').trim();
+    socket.on("disconnect", () => {
+      const sessionId = String(socket.data.sessionId ?? "").trim();
       if (!sessionId) {
         return;
       }
@@ -117,10 +123,10 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
 
     function relayWebRtc(
       sourceSocket: typeof socket,
-      event: 'webrtc:offer' | 'webrtc:answer' | 'webrtc:candidate',
-      payload: { toSessionId: string; data: unknown }
+      event: "webrtc:offer" | "webrtc:answer" | "webrtc:candidate",
+      payload: { toSessionId: string; data: unknown },
     ): void {
-      const fromSessionId = String(sourceSocket.data.sessionId ?? '').trim();
+      const fromSessionId = String(sourceSocket.data.sessionId ?? "").trim();
       if (!fromSessionId) {
         return;
       }
@@ -134,12 +140,12 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
             return;
           }
           io.to(targetSocketId).emit(forwardEvent, body);
-        }
+        },
       });
     }
   });
 
-  io.engine.on('close', () => {
+  io.engine.on("close", () => {
     stopProximityService();
   });
 

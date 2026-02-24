@@ -8,20 +8,20 @@
  * - 启动邻近服务（检测玩家之间的距离并推送附近玩家列表）
  */
 
-const path = require('path');
-const http = require('http');
-const express = require('express');
+const path = require("path");
+const http = require("http");
+const express = require("express");
 
 // 导入配置模块
-const { readConfig } = require('./config');
+const { readConfig } = require("./config");
 // 导入 ICE 服务器配置（用于 WebRTC NAT 穿透）
-const { getIceServersFromEnv } = require('./http/iceConfig');
+const { getIceServersFromEnv } = require("./http/iceConfig");
 // 导入状态管理类（管理游戏玩家和客户端会话）
-const { State } = require('./domain/state');
+const { State } = require("./domain/state");
 // 导入邻近服务（检测玩家距离）
-const { startProximityService } = require('./domain/proximityService');
+const { startProximityService } = require("./domain/proximityService");
 // 导入信令服务器（处理 WebSocket 连接和 WebRTC 信令）
-const { attachSignalingServer } = require('./signaling/signalingServer');
+const { attachSignalingServer } = require("./signaling/signalingServer");
 
 // 读取配置
 const config = readConfig();
@@ -31,7 +31,7 @@ const state = new State();
 // 创建 Express 应用
 const app = express();
 // 提供静态文件服务（前端页面）
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
 /**
  * ICE 服务器配置 API
@@ -39,7 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
  * 客户端通过此接口获取 STUN/TURN 服务器配置，
  * 用于 WebRTC 连接的 NAT 穿透
  */
-app.get('/api/ice', (_req, res) => {
+app.get("/api/ice", (_req, res) => {
   res.json({ iceServers: getIceServersFromEnv() });
 });
 
@@ -74,9 +74,8 @@ attachSignalingServer({
  */
 startProximityService({
   state,
-  callRadius: config.callRadius,          // 通话半径（方块距离）
-  tickMs: config.proximityTickMs,         // 检测间隔（毫秒）
+  callRadius: config.callRadius, // 通话半径（方块距离）
+  tickMs: config.proximityTickMs, // 检测间隔（毫秒）
   gamePlayerTtlMs: config.gamePlayerTtlMs, // 玩家数据过期时间（毫秒）
   debug: config.debug,
 });
-

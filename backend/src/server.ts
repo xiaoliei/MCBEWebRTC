@@ -1,10 +1,10 @@
-import http from 'node:http';
-import { readConfig } from './config/readConfig.js';
-import { ReconnectCodeStore } from './domain/session/ReconnectCodeStore.js';
-import { SessionStore } from './domain/session/SessionStore.js';
-import { StateStore } from './domain/state/StateStore.js';
-import { createApp } from './http/createApp.js';
-import { createSocketServer } from './signaling/createSocketServer.js';
+import http from "node:http";
+import { readConfig } from "./config/readConfig.js";
+import { ReconnectCodeStore } from "./domain/session/ReconnectCodeStore.js";
+import { SessionStore } from "./domain/session/SessionStore.js";
+import { StateStore } from "./domain/state/StateStore.js";
+import { createApp } from "./http/createApp.js";
+import { createSocketServer } from "./signaling/createSocketServer.js";
 
 const config = readConfig();
 
@@ -21,13 +21,13 @@ createSocketServer({
     bridgeToken: config.bridgeToken,
     callRadius: 16,
     tickMs: 200,
-    gamePlayerTtlMs: 30_000
+    gamePlayerTtlMs: 30_000,
   },
   stores: {
     stateStore,
     sessionStore,
-    reconnectCodeStore
-  }
+    reconnectCodeStore,
+  },
 });
 
 httpServer.listen(config.port, config.host, () => {

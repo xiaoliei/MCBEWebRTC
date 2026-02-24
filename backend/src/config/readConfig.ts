@@ -11,7 +11,9 @@ export interface AppConfig {
   iceServers: IceServerDto[];
 }
 
-const DEFAULT_ICE_SERVERS: IceServerDto[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+const DEFAULT_ICE_SERVERS: IceServerDto[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+];
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -29,22 +31,23 @@ function parseIceServers(rawIceServers: string | undefined): IceServerDto[] {
   try {
     const parsed = JSON.parse(rawIceServers) as unknown;
     if (!Array.isArray(parsed)) {
-      throw new Error('ICE_SERVERS 必须是数组');
+      throw new Error("ICE_SERVERS 必须是数组");
     }
 
     return parsed.map((item) => {
-      if (typeof item !== 'object' || item === null || !('urls' in item)) {
-        throw new Error('ICE_SERVERS 中的每项都必须包含 urls 字段');
+      if (typeof item !== "object" || item === null || !("urls" in item)) {
+        throw new Error("ICE_SERVERS 中的每项都必须包含 urls 字段");
       }
 
       const iceServer = item as IceServerDto;
       if (
         !(
-          typeof iceServer.urls === 'string' ||
-          (Array.isArray(iceServer.urls) && iceServer.urls.every((url) => typeof url === 'string'))
+          typeof iceServer.urls === "string" ||
+          (Array.isArray(iceServer.urls) &&
+            iceServer.urls.every((url) => typeof url === "string"))
         )
       ) {
-        throw new Error('ICE_SERVERS.urls 必须是字符串或字符串数组');
+        throw new Error("ICE_SERVERS.urls 必须是字符串或字符串数组");
       }
 
       return iceServer;
@@ -55,13 +58,15 @@ function parseIceServers(rawIceServers: string | undefined): IceServerDto[] {
   }
 }
 
-export function readConfig(env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): AppConfig {
-  const bridgeToken = env.BRIDGE_TOKEN?.trim() || 'replace-with-strong-token';
+export function readConfig(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): AppConfig {
+  const bridgeToken = env.BRIDGE_TOKEN?.trim() || "replace-with-strong-token";
 
   return {
     port: parsePort(env.PORT),
-    host: env.HOST?.trim() || '0.0.0.0',
+    host: env.HOST?.trim() || "0.0.0.0",
     bridgeToken,
-    iceServers: parseIceServers(env.ICE_SERVERS)
+    iceServers: parseIceServers(env.ICE_SERVERS),
   };
 }

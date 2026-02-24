@@ -22,7 +22,7 @@ export class SessionStore {
       sessionId: input.sessionId,
       playerName: normalizedName,
       socketId: input.socketId,
-      connectedAt: input.connectedAt
+      connectedAt: input.connectedAt,
     };
 
     // 写入双索引，后续查询可按会话或按玩家名快速定位。

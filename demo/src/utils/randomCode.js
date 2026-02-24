@@ -21,10 +21,9 @@ function randomDigits(length) {
   const size = Math.max(1, Number.parseInt(length, 10) || 6);
   const max = 10 ** size;
   const value = Math.floor(Math.random() * max);
-  return String(value).padStart(size, '0');
+  return String(value).padStart(size, "0");
 }
 
 module.exports = {
   randomDigits,
 };
-

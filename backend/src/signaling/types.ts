@@ -32,7 +32,10 @@ export interface WebRtcSignalRelayPayload {
   data: unknown;
 }
 
-export type ConnectDeniedReason = 'DUPLICATE_NAME' | 'INVALID_CODE' | 'INVALID_PAYLOAD';
+export type ConnectDeniedReason =
+  | "DUPLICATE_NAME"
+  | "INVALID_CODE"
+  | "INVALID_PAYLOAD";
 
 export interface ConnectDeniedPayload {
   reason: ConnectDeniedReason;

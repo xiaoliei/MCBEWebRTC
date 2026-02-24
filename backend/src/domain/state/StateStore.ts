@@ -34,7 +34,7 @@ export class StateStore {
       position: { x: 0, y: 0, z: 0 },
       dim: null,
       playerId: null,
-      lastSeenAt: 0
+      lastSeenAt: 0,
     };
 
     // 仅覆盖传入字段，避免旧数据被无意义重置。

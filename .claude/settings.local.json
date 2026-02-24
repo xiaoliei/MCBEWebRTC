@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run build --prefix frontend)",
+      "Bash(npm run lint)",
+      "Bash(npm run format)"
+    ]
+  }
+}

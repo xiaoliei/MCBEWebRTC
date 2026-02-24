@@ -1,5 +1,9 @@
-import type { ClientSession, SessionStore } from '../session/SessionStore.js';
-import type { GamePlayerState, StateStore, Vector3 } from '../state/StateStore.js';
+import type { ClientSession, SessionStore } from "../session/SessionStore.js";
+import type {
+  GamePlayerState,
+  StateStore,
+  Vector3,
+} from "../state/StateStore.js";
 
 export interface NearbyPlayerItem {
   sessionId: string;
@@ -25,15 +29,27 @@ function distanceSquared(a: Vector3, b: Vector3): number {
   return dx * dx + dy * dy + dz * dz;
 }
 
-function canConnect(selfPlayer: GamePlayerState, otherPlayer: GamePlayerState, radiusSquared: number): boolean {
-  if (selfPlayer.dim !== null && otherPlayer.dim !== null && selfPlayer.dim !== otherPlayer.dim) {
+function canConnect(
+  selfPlayer: GamePlayerState,
+  otherPlayer: GamePlayerState,
+  radiusSquared: number,
+): boolean {
+  if (
+    selfPlayer.dim !== null &&
+    otherPlayer.dim !== null &&
+    selfPlayer.dim !== otherPlayer.dim
+  ) {
     return false;
   }
 
-  return distanceSquared(selfPlayer.position, otherPlayer.position) <= radiusSquared;
+  return (
+    distanceSquared(selfPlayer.position, otherPlayer.position) <= radiusSquared
+  );
 }
 
-export function startProximityService(options: StartProximityServiceOptions): () => void {
+export function startProximityService(
+  options: StartProximityServiceOptions,
+): () => void {
   const radiusSquared = options.callRadius * options.callRadius;
   const lastSentKeyBySessionId = new Map<string, string>();
   const nowProvider = options.nowProvider ?? (() => Date.now());
@@ -48,10 +64,10 @@ export function startProximityService(options: StartProximityServiceOptions): ()
         session,
         sessions,
         stateStore: options.stateStore,
-        radiusSquared
+        radiusSquared,
       });
 
-      const nextKey = nearbyPlayers.map((item) => item.sessionId).join(',');
+      const nextKey = nearbyPlayers.map((item) => item.sessionId).join(",");
       if (lastSentKeyBySessionId.get(session.sessionId) === nextKey) {
         continue;
       }
@@ -82,8 +98,13 @@ function collectNearbyPlayers(input: {
       continue;
     }
 
-    const otherPlayer = input.stateStore.getPlayerByName(otherSession.playerName);
-    if (!otherPlayer || !canConnect(selfPlayer, otherPlayer, input.radiusSquared)) {
+    const otherPlayer = input.stateStore.getPlayerByName(
+      otherSession.playerName,
+    );
+    if (
+      !otherPlayer ||
+      !canConnect(selfPlayer, otherPlayer, input.radiusSquared)
+    ) {
       continue;
     }
 
@@ -91,7 +112,7 @@ function collectNearbyPlayers(input: {
       sessionId: otherSession.sessionId,
       playerName: otherSession.playerName,
       position: otherPlayer.position,
-      dim: otherPlayer.dim
+      dim: otherPlayer.dim,
     });
   }
 

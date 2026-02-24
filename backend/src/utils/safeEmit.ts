@@ -10,7 +10,7 @@ export function safeEmit(
   emitter: EmitterLike,
   event: string,
   payload: unknown,
-  options: SafeEmitOptions = {}
+  options: SafeEmitOptions = {},
 ): boolean {
   try {
     emitter.emit(event, payload);
