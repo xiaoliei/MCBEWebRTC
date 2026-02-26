@@ -11,7 +11,7 @@ import { handleWebRtcRelay } from "./handlers/webrtcRelay.js";
 import { authBridge } from "./middleware/authBridge.js";
 
 export interface SocketServerOptions {
-  bridgeToken: string;
+  bridgeJwtSecret: string;
   callRadius: number;
   tickMs: number;
   gamePlayerTtlMs: number;
@@ -55,12 +55,25 @@ export function createSocketServer(input: CreateSocketServerInput): Server {
   });
 
   io.on("connection", (socket) => {
-    const bridgeAuth = authBridge(socket, input.options.bridgeToken);
+    const bridgeAuth = authBridge(socket, input.options.bridgeJwtSecret);
     if (bridgeAuth.isBridge) {
       if (!bridgeAuth.authorized) {
-        socket.emit("auth:rejected", { reason: "UNAUTHORIZED" });
+        socket.emit("auth:rejected", {
+          reason: bridgeAuth.rejectReason ?? "UNAUTHORIZED",
+        });
         socket.disconnect(true);
         return;
+      }
+
+      // 中文注释：把桥接网关身份写入 socket.data，便于后续链路追踪与审计。
+      socket.data.gatewayId = bridgeAuth.gatewayId;
+      socket.data.role = "mc-bridge";
+
+      if (bridgeAuth.payload?.exp) {
+        const expiresAt = new Date(bridgeAuth.payload.exp * 1000).toISOString();
+        console.log(
+          `[backend][bridge] authenticated gatewayId=${bridgeAuth.gatewayId ?? "unknown"} expiresAt=${expiresAt}`,
+        );
       }
 
       socket.emit("auth:accepted");

@@ -7,7 +7,8 @@ const config = readConfig();
 
 const bridge = new SignalingBridge({
   backendUrl: config.backendUrl,
-  bridgeToken: config.bridgeToken,
+  bridgeJwtSecret: config.bridgeJwtSecret,
+  jwtExpiresIn: config.jwtExpiresIn,
   debug: config.debug
 });
 

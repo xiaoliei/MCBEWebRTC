@@ -21,7 +21,8 @@ npm run start
 ## 环境变量
 
 - `BACKEND_URL`：后端地址（默认 `http://127.0.0.1:3000`）
-- `BRIDGE_TOKEN`：桥接鉴权 token（需与 backend 一致）
+- `BRIDGE_JWT_SECRET`：桥接 JWT 签名密钥（需与 backend 一致）
+- `JWT_EXPIRES_IN`：桥接 JWT 有效期（默认 `2h`，示例：`30m`/`2h`/`1d`）
 - `GATEWAY_PORT`：网关监听端口（默认 `8000`）
 - `DEBUG`：调试日志开关（`true/false`）
 

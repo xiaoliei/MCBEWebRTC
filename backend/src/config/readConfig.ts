@@ -7,7 +7,8 @@ export interface IceServerDto {
 export interface AppConfig {
   port: number;
   host: string;
-  bridgeToken: string;
+  bridgeJwtSecret: string;
+  jwtExpiresIn: string;
   iceServers: IceServerDto[];
 }
 
@@ -58,11 +59,11 @@ function parseIceServers(rawIceServers: string | undefined): IceServerDto[] {
   }
 }
 
-function parseBridgeToken(rawToken: string | undefined): string {
-  const token = rawToken?.trim();
-  if (!token) {
+function parseBridgeJwtSecret(rawSecret: string | undefined): string {
+  const secret = rawSecret?.trim();
+  if (!secret) {
     throw new Error(
-      "BRIDGE_TOKEN 环境变量未设置,请设置为强随机字符串用于网关鉴权"
+      "BRIDGE_JWT_SECRET 环境变量未设置,请设置为强随机字符串用于网关鉴权"
     );
   }
 
@@ -72,14 +73,26 @@ function parseBridgeToken(rawToken: string | undefined): string {
     "your-secure-random-token-here",
     "change_me_in_production",
   ];
-  const lowerToken = token.toLowerCase();
-  if (placeholders.some((p) => lowerToken === p.toLowerCase())) {
+  const lowerSecret = secret.toLowerCase();
+  if (placeholders.some((p) => lowerSecret === p.toLowerCase())) {
     throw new Error(
-      `BRIDGE_TOKEN 使用了占位符 "${token}",请设置为强随机字符串用于生产环境`
+      `BRIDGE_JWT_SECRET 使用了占位符 "${secret}",请设置为强随机字符串用于生产环境`
     );
   }
 
-  return token;
+  if (secret.length < 16) {
+    throw new Error("BRIDGE_JWT_SECRET 长度至少需要 16 个字符");
+  }
+
+  return secret;
+}
+
+function parseJwtExpiresIn(rawValue: string | undefined): string {
+  const value = String(rawValue ?? "2h").trim();
+  if (!/^\d+[smhd]$/i.test(value)) {
+    throw new Error("JWT_EXPIRES_IN 格式无效,支持格式示例: 30m / 2h / 1d");
+  }
+  return value;
 }
 
 export function readConfig(
@@ -88,7 +101,8 @@ export function readConfig(
   return {
     port: parsePort(env.PORT),
     host: env.HOST?.trim() || "0.0.0.0",
-    bridgeToken: parseBridgeToken(env.BRIDGE_TOKEN),
+    bridgeJwtSecret: parseBridgeJwtSecret(env.BRIDGE_JWT_SECRET),
+    jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN),
     iceServers: parseIceServers(env.ICE_SERVERS),
   };
 }

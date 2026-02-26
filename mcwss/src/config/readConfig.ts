@@ -1,6 +1,7 @@
 export interface AppConfig {
   backendUrl: string;
-  bridgeToken: string;
+  bridgeJwtSecret: string;
+  jwtExpiresIn: string;
   gatewayPort: number;
   debug: boolean;
 }
@@ -27,11 +28,11 @@ function normalizeBackendUrl(rawUrl: string | undefined): string {
 }
 
 /**
- * 验证并解析 BRIDGE_TOKEN
- * 拒绝空值或常见的占位符值，防止生产环境使用不安全的 token
+ * 验证并解析 BRIDGE_JWT_SECRET
+ * 拒绝空值或常见的占位符值，防止生产环境使用不安全的密钥
  */
-function parseToken(rawValue: string | undefined): string {
-  const token = rawValue?.trim() ?? '';
+function parseBridgeJwtSecret(rawValue: string | undefined): string {
+  const secret = rawValue?.trim() ?? '';
   const placeholders = [
     'change_me_in_production',
     'replace-with-strong-token',
@@ -41,20 +42,34 @@ function parseToken(rawValue: string | undefined): string {
     'example-token',
   ];
 
-  if (!token) {
+  if (!secret) {
     throw new Error(
-      'BRIDGE_TOKEN is required. Please set BRIDGE_TOKEN environment variable.'
+      'BRIDGE_JWT_SECRET is required. Please set BRIDGE_JWT_SECRET environment variable.'
     );
   }
 
-  const lowerToken = token.toLowerCase();
-  if (placeholders.some((p) => p === lowerToken)) {
+  const lowerSecret = secret.toLowerCase();
+  if (placeholders.some((p) => p === lowerSecret)) {
     throw new Error(
-      'BRIDGE_TOKEN appears to be a placeholder. Please set a secure token.'
+      'BRIDGE_JWT_SECRET appears to be a placeholder. Please set a secure secret.'
     );
   }
 
-  return token;
+  if (secret.length < 16) {
+    throw new Error('BRIDGE_JWT_SECRET must be at least 16 characters long.');
+  }
+
+  return secret;
+}
+
+function parseJwtExpiresIn(rawValue: string | undefined): string {
+  const expiresIn = String(rawValue ?? '2h').trim();
+  if (!/^\d+[smhd]$/i.test(expiresIn)) {
+    throw new Error(
+      'JWT_EXPIRES_IN format is invalid. Examples: 30m, 2h, 1d.'
+    );
+  }
+  return expiresIn;
 }
 
 export function readConfig(
@@ -62,7 +77,8 @@ export function readConfig(
 ): AppConfig {
   return {
     backendUrl: normalizeBackendUrl(env.BACKEND_URL),
-    bridgeToken: parseToken(env.BRIDGE_TOKEN),
+    bridgeJwtSecret: parseBridgeJwtSecret(env.BRIDGE_JWT_SECRET),
+    jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN),
     gatewayPort: parsePort(env.GATEWAY_PORT),
     debug: parseBool(env.DEBUG)
   };

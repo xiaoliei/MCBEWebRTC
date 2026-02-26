@@ -19,7 +19,7 @@ const httpServer = http.createServer(app);
 createSocketServer({
   httpServer,
   options: {
-    bridgeToken: config.bridgeToken,
+    bridgeJwtSecret: config.bridgeJwtSecret,
     callRadius: 16,
     tickMs: 200,
     gamePlayerTtlMs: 30_000,

@@ -24,7 +24,8 @@ npm run start
 
 - `PORT`：HTTP 服务器端口（默认 `3000`）
 - `HOST`：监听地址（默认 `0.0.0.0`）
-- `BRIDGE_TOKEN`：网关认证 token（必须配置，不能使用占位符）
+- `BRIDGE_JWT_SECRET`：网关 JWT 签名密钥（必须配置，不能使用占位符）
+- `JWT_EXPIRES_IN`：网关 JWT 有效期（默认 `2h`，示例：`30m`/`2h`/`1d`）
 - `ICE_SERVERS`：WebRTC ICE 服务器配置（JSON 数组格式，默认使用 Google STUN）
 
 ### 环境变量示例
@@ -32,7 +33,8 @@ npm run start
 ```bash
 PORT=3000
 HOST=0.0.0.0
-BRIDGE_TOKEN=your-secure-random-token-here
+BRIDGE_JWT_SECRET=your-secure-random-token-here
+JWT_EXPIRES_IN=2h
 ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"}]
 ```
 

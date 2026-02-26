@@ -15,12 +15,14 @@
   "dependencies": {
     "@mcbewss/shared": "file:../shared",
     "dotenv": "17.3.1",
+    "jsonwebtoken": "9.0.3",
     "socket.io-client": "4.8.3",
     "uuid": "13.0.0",
     "ws": "8.19.0"
   },
   "devDependencies": {
     "@eslint/js": "9.39.1",
+    "@types/jsonwebtoken": "9.0.10",
     "@types/node": "25.3.0",
     "@types/ws": "8.18.1",
     "eslint": "9.39.1",

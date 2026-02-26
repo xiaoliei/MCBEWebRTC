@@ -1,4 +1,5 @@
 import http from "node:http";
+import jwt from "jsonwebtoken";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
 import { createApp } from "../../../src/http/createApp.js";
@@ -11,6 +12,7 @@ describe("mc bridge flow", () => {
   let server: http.Server;
   let baseUrl: string;
   const sockets: Socket[] = [];
+  const BRIDGE_JWT_SECRET = "bridge-secret-for-jwt-tests";
 
   beforeEach(async () => {
     const app = createApp({
@@ -22,7 +24,7 @@ describe("mc bridge flow", () => {
     createSocketServer({
       httpServer: server,
       options: {
-        bridgeToken: "bridge-secret",
+        bridgeJwtSecret: BRIDGE_JWT_SECRET,
         callRadius: 8,
         tickMs: 30,
         gamePlayerTtlMs: 60_000,
@@ -75,12 +77,15 @@ describe("mc bridge flow", () => {
       badBridge,
       "auth:rejected",
     );
-    expect(rejected.reason).toBe("UNAUTHORIZED");
+    expect(rejected.reason).toBe("INVALID_TOKEN");
   });
 
   it("bridge 上报位置后 client 能收到 presence:nearby", async () => {
     const bridge = createClient(baseUrl, {
-      auth: { clientType: "mc-bridge", token: "bridge-secret" },
+      auth: {
+        clientType: "mc-bridge",
+        token: createBridgeJwt(BRIDGE_JWT_SECRET, "gateway-flow-test"),
+      },
       transports: ["websocket"],
     });
     sockets.push(bridge);
@@ -140,5 +145,12 @@ function waitForEvent<T>(
     };
 
     socket.once(event, onEvent);
+  });
+}
+
+function createBridgeJwt(secret: string, gatewayId: string): string {
+  return jwt.sign({ role: "mc-bridge", gatewayId }, secret, {
+    algorithm: "HS256",
+    expiresIn: "2h",
   });
 }
