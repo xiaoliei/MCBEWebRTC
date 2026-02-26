@@ -47,6 +47,9 @@ export function App({
 
       <p data-testid="status">状态: {state.status}</p>
       <p data-testid="session">Session: {state.sessionId || '-'}</p>
+      <p data-testid="microphone">
+        麦克风: {state.microphoneGranted ? '已授权' : '未授权'}
+      </p>
 
       {state.denyReason === 'DUPLICATE_NAME' ? (
         <p role="alert">昵称重复，请更换后重试</p>
@@ -56,6 +59,16 @@ export function App({
       <ul>
         {state.nearbyPlayers.map((player) => (
           <li key={player.sessionId}>{player.playerName}</li>
+        ))}
+      </ul>
+
+      <h2>通话连接</h2>
+      <ul>
+        {Object.entries(state.peerStates).map(([sessionId, peer]) => (
+          <li key={sessionId}>
+            {peer.playerName}: {peer.phase} / {peer.iceConnectionState}{' '}
+            {peer.hasRemoteTrack ? '🎧' : ''}
+          </li>
         ))}
       </ul>
     </main>

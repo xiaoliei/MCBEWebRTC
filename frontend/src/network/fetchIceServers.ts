@@ -30,7 +30,9 @@ export async function fetchIceServers(
       : FALLBACK_STUN;
     cachedIceServers = servers;
     return servers;
-  } catch {
+  } catch (error) {
+    // 中文注释：记录 ICE 拉取异常，便于排查后端或网络问题。
+    console.warn('[fetchIceServers] fallback to default STUN', error);
     // 中文注释：MVP 阶段网络异常时直接回退默认 STUN，避免阻塞后续信令流程。
     cachedIceServers = FALLBACK_STUN;
     return FALLBACK_STUN;
