@@ -81,6 +81,14 @@ export class McGateway {
         if (!payload) {
           return;
         }
+        // 记录玩家移动事件日志
+        if (this.debug) {
+          console.log(
+            `[mcwss][gateway] 玩家移动事件: ${payload.playerName} -> ` +
+              `(${payload.position.x.toFixed(2)}, ${payload.position.y.toFixed(2)}, ${payload.position.z.toFixed(2)}) ` +
+              `维度: ${payload.dim ?? '未知'}`
+          );
+        }
         this.onPlayerTransform(payload);
       });
 
@@ -147,6 +155,7 @@ export class McGateway {
     }
   }
 
+  // 订阅玩家移动事件
   private subscribePlayerTransform(socket: WebSocket): void {
     socket.send(
       JSON.stringify({
@@ -157,10 +166,13 @@ export class McGateway {
           messagePurpose: 'subscribe'
         },
         body: {
-          eventName: 'PlayerTransform'
+          eventName: 'PlayerTravelled'
         }
       })
     );
+    if (this.debug) {
+      console.log('[mcwss][gateway] 已订阅 PlayerTravelled 事件');
+    }
   }
 
   private tryParseTransform(
@@ -176,7 +188,8 @@ export class McGateway {
       return null;
     }
 
-    if (message.header?.eventName !== 'PlayerTransform') {
+    // 验证是否为玩家移动事件
+    if (message.header?.eventName !== 'PlayerTravelled') {
       return null;
     }
 
