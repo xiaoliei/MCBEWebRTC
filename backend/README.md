@@ -1,4 +1,4 @@
-# @mcbewss/backend
+# @mcbewebrtc/backend
 
 后端服务（Express + Socket.io），提供信令服务和 HTTP API。
 

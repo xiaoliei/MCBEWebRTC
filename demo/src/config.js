@@ -62,7 +62,7 @@ function parseBoolEnv(name, fallback) {
  * - PROXIMITY_TICK_MS: 邻近检测间隔（毫秒，默认：250）
  * - GAME_PLAYER_TTL_MS: 玩家数据过期时间（毫秒，默认：10000）
  * - RECONNECT_CODE_TTL_MS: 重连验证码有效期（毫秒，默认：120000）
- * - MCBEWSS_TOKEN: Minecraft 网关认证令牌（默认：空字符串）
+ * - MCBEWEBRTC_TOKEN: Minecraft 网关认证令牌（默认：空字符串）
  * - DEBUG: 调试模式（默认：false）
  *
  * @returns {Object} 配置对象
@@ -82,7 +82,7 @@ function readConfig() {
     reconnectCodeTtlMs: parseIntEnv("RECONNECT_CODE_TTL_MS", 120_000),
 
     // 认证和调试配置
-    mcToken: process.env.MCBEWSS_TOKEN || "",
+    mcToken: process.env.MCBEWEBRTC_TOKEN || "",
     debug: parseBoolEnv("DEBUG", false),
   };
 }

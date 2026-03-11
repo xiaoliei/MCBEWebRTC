@@ -1,4 +1,4 @@
-# MCBEWSS（MC WebSocket + WebRTC 距离语音）
+# MCBEWebRTC（MC WebSocket + WebRTC 距离语音）
 
 ## 运行
 
@@ -12,7 +12,7 @@
 - `CALL_RADIUS`：附近判断半径（默认 `10`）
 - `PROXIMITY_TICK_MS`：附近列表计算周期（默认 `250`）
 - `GAME_PLAYER_TTL_MS`：位置数据过期时间（默认 `10000`）
-- `MCBEWSS_TOKEN`：网关认证 token（建议设置；信令与网关需一致）
+- `MCBEWEBRTC_TOKEN`：网关认证 token（建议设置；信令与网关需一致）
 
 ### TURN（跨公网/NAT 建议必配）
 

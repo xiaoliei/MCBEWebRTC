@@ -44,7 +44,7 @@ function parseBoolEnv(name, fallback) {
  * 环境变量说明：
  * - GATEWAY_PORT: 网关监听端口（默认：8000）
  * - SIGNALING_URL: 主服务器 WebSocket URL（默认：ws://localhost:3000/ws）
- * - MCBEWSS_TOKEN: 认证令牌（默认：空字符串）
+ * - MCBEWEBRTC_TOKEN: 认证令牌（默认：空字符串）
  * - DEBUG: 调试模式（默认：false）
  *
  * @returns {Object} 配置对象
@@ -56,7 +56,7 @@ function readConfig() {
     // 主服务器信令 URL
     signalingUrl: process.env.SIGNALING_URL || "ws://localhost:3000/ws",
     // 认证令牌（必须与主服务器配置一致）
-    mcToken: process.env.MCBEWSS_TOKEN || "",
+    mcToken: process.env.MCBEWEBRTC_TOKEN || "",
     // 调试模式
     debug: parseBoolEnv("DEBUG", false),
   };

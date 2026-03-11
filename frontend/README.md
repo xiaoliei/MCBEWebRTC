@@ -1,4 +1,4 @@
-# @mcbewss/frontend
+# @mcbewebrtc/frontend
 
 Web 前端 MVP（React + TypeScript + Vite + socket.io-client）。
 

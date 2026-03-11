@@ -1,4 +1,4 @@
-# @mcbewss/mcwss
+# @mcbewebrtc/mcwss
 
 Minecraft WebSocket 网关（TypeScript + Socket.io client），负责将游戏侧 `PlayerTransform` 上报到 `backend`。
 

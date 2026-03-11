@@ -9,4 +9,4 @@ export type {
   PositionDto,
   ClientToServerEvents,
   ServerToClientEvents
-} from '@mcbewss/shared';
+} from '@mcbewebrtc/shared';
