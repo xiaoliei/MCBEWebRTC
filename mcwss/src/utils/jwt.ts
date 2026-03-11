@@ -39,20 +39,20 @@ function parseExpiresInToMs(expiresIn: SignOptions["expiresIn"]): number {
 
 export function issueBridgeJwt(
   bridgeJwtSecret: string,
-  expiresIn: SignOptions["expiresIn"] = "2h",
+  expiresIn: string = "2h",
 ): IssuedBridgeJwt {
   const gatewayId = randomUUID();
 
   // 中文注释：只把稳定业务字段放入 payload，iat/exp 由 jsonwebtoken 自动注入。
   const token = jwt.sign({ role: "mc-bridge", gatewayId }, bridgeJwtSecret, {
     algorithm: "HS256",
-    expiresIn,
+    expiresIn: expiresIn as SignOptions["expiresIn"],
   });
 
   return {
     token,
     gatewayId,
-    expiresAtMs: Date.now() + parseExpiresInToMs(expiresIn),
+    expiresAtMs: Date.now() + parseExpiresInToMs(expiresIn as SignOptions["expiresIn"]),
   };
 }
 
