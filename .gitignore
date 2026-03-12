@@ -7,3 +7,4 @@ dist/
 .github/
 .claude/
 CLAUDE.md
+/.worktrees/
