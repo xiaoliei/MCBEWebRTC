@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createSignalingService } from '../../src/signaling/createSignalingService';
+import type { ConnectDeniedReason } from '@mcbewebrtc/shared';
 import type {
   GatewayEventMap,
   SocketGateway
@@ -10,6 +11,8 @@ class FakeGateway implements SocketGateway {
   private handlers: Partial<
     Record<keyof GatewayEventMap, Array<(payload: unknown) => void>>
   > = {};
+  // 用于保存上次 join 的参数
+  private lastJoinParams: { playerName: string; token?: string } = { playerName: '' };
 
   connect(): void {
     this.sent.push({ event: 'connect' });
@@ -21,7 +24,17 @@ class FakeGateway implements SocketGateway {
   }
 
   join(playerName: string, code?: string): void {
+    this.lastJoinParams = { playerName, token: code };
     this.sent.push({ event: 'client:join', payload: { playerName, code } });
+  }
+
+  // 用于测试 retryWithForceReplace 方法
+  retryWithForceReplace(): void {
+    const { playerName, token } = this.lastJoinParams;
+    this.sent.push({
+      event: 'client:join',
+      payload: { playerName, token, forceReplace: true }
+    });
   }
 
   requestPresenceList(): void {
@@ -102,6 +115,49 @@ describe('createSignalingService', () => {
 
     expect(service.getState().status).toBe('denied');
     expect(service.getState().denyReason).toBe('DUPLICATE_NAME');
+  });
+
+  it.each<ConnectDeniedReason>([
+    'TOKEN_INVALID',
+    'TOKEN_EXPIRED',
+    'TOKEN_REVOKED',
+    'TOKEN_MISSING',
+    'TOKEN_PLAYER_MISMATCH',
+    'FORCE_REPLACE_REQUIRED'
+  ])('应消费 shared 契约中的 token deny reason: %s', (reason) => {
+    const gateway = new FakeGateway();
+    const service = createSignalingService(gateway);
+
+    service.join('Alice');
+    gateway.emit('connect:denied', { reason });
+
+    expect(service.getState().status).toBe('denied');
+    expect(service.getState().denyReason).toBe(reason);
+  });
+
+  it('应仅在 TOKEN_EXPIRED 时触发 onTokenExpired，不依赖 INVALID_TOKEN', () => {
+    const gateway = new FakeGateway();
+    const onTokenExpired = vi.fn();
+    createSignalingService(gateway, { onTokenExpired });
+
+    const reasons: Array<ConnectDeniedReason> = [
+      'TOKEN_INVALID',
+      'TOKEN_REVOKED',
+      'TOKEN_MISSING',
+      'TOKEN_PLAYER_MISMATCH'
+    ];
+
+    reasons.forEach((reason) => {
+      gateway.emit('connect:denied', { reason });
+    });
+    // 中文注释：INVALID_TOKEN 不在 shared 契约里，运行时即使收到也不应触发回调。
+    gateway.emit('connect:denied', {
+      reason: 'INVALID_TOKEN' as unknown as ConnectDeniedReason
+    });
+    expect(onTokenExpired).toHaveBeenCalledTimes(0);
+
+    gateway.emit('connect:denied', { reason: 'TOKEN_EXPIRED' });
+    expect(onTokenExpired).toHaveBeenCalledTimes(1);
   });
 
   it('应支持 webrtc 信令出入站与状态机更新', () => {

@@ -1,8 +1,4 @@
-import type { NearbyPlayerDto } from '../../../shared/src/types/presence.js';
-import type {
-  ConnectDeniedReason,
-  WebRtcSignalRelayPayload
-} from '../../../shared/src/types/signaling.js';
+import type { NearbyPlayerDto, ConnectDeniedReason, WebRtcSignalRelayPayload } from '@mcbewebrtc/shared';
 import type { SocketGateway } from './SocketGateway';
 import { fetchIceServers } from '../network/fetchIceServers';
 import { AudioService } from '../audio/AudioService';
@@ -10,6 +6,21 @@ import {
   WebRTCConnectionManager,
   type ConnectionState
 } from '../webrtc/WebRTCConnectionManager';
+
+/**
+ * Token 认证相关常量
+ */
+const TOKEN_EXPIRED = 'TOKEN_EXPIRED';
+
+/**
+ * Token 认证失败时触发重新验证的回调选项
+ */
+export interface TokenAuthOptions {
+  /**
+   * 当收到 TOKEN_EXPIRED 或其他需要重新验证的错误时调用
+   */
+  onTokenExpired?: () => void;
+}
 
 export type PeerPhase =
   | 'idle'
@@ -48,8 +59,21 @@ export interface SignalingState {
 export interface SignalingService {
   getState(): SignalingState;
   subscribe(listener: (state: SignalingState) => void): () => void;
-  join(playerName: string, code?: string): void;
+  /**
+   * 加入游戏，支持 token 认证
+   * @param playerName 玩家名称
+   * @param token JWT 令牌（可选）
+   */
+  join(playerName: string, token?: string): void;
+  /**
+   * 使用 forceReplace=true 重新加入，用于处理 FORCE_REPLACE_REQUIRED 拒绝
+   */
+  retryWithForceReplace(): void;
   disconnect(): void;
+  /**
+   * 销毁服务，清理所有事件监听器
+   */
+  dispose(): void;
   requestPresence(): void;
   sendOffer(toSessionId: string, data: unknown): void;
   sendAnswer(toSessionId: string, data: unknown): void;
@@ -57,7 +81,8 @@ export interface SignalingService {
 }
 
 export function createSignalingService(
-  gateway: SocketGateway
+  gateway: SocketGateway,
+  options?: TokenAuthOptions
 ): SignalingService {
   const audioService = new AudioService();
   let manager: WebRTCConnectionManager | null = null;
@@ -73,6 +98,8 @@ export function createSignalingService(
     microphoneGranted: false
   };
   const listeners = new Set<(nextState: SignalingState) => void>();
+  // 中文注释：保存 gateway 事件监听器的清理函数，用于 dispose 时移除监听器
+  const eventCleanups: Array<() => void> = [];
 
   const setState = (
     updater: (prev: SignalingState) => SignalingState
@@ -88,7 +115,10 @@ export function createSignalingService(
     );
   };
 
-  const ensurePeerState = (sessionId: string, playerName: string): PeerState => {
+  const ensurePeerState = (
+    sessionId: string,
+    playerName: string
+  ): PeerState => {
     return (
       state.peerStates[sessionId] ?? {
         phase: 'idle',
@@ -151,7 +181,9 @@ export function createSignalingService(
     return hasValidType || typeof sdp === 'string';
   };
 
-  const isRtcIceCandidate = (payload: unknown): payload is RTCIceCandidateInit => {
+  const isRtcIceCandidate = (
+    payload: unknown
+  ): payload is RTCIceCandidateInit => {
     return Boolean(payload) && typeof payload === 'object';
   };
 
@@ -272,135 +304,154 @@ export function createSignalingService(
     syncPeerStatesFromManager();
   };
 
-  gateway.on('connected', (payload) => {
-    setState((prev) => ({
-      ...prev,
-      status: 'connected',
-      sessionId: payload.sessionId,
-      playerName: payload.playerName,
-      denyReason: ''
-    }));
-    gateway.requestPresenceList();
-    void setupWebRtc().catch((error) => {
-      // 中文注释：初始化失败时保留信令可用，仅关闭语音能力并标记权限状态。
-      console.warn('[SignalingService] setupWebRtc failed', error);
+  eventCleanups.push(
+    gateway.on('connected', (payload) => {
       setState((prev) => ({
         ...prev,
+        status: 'connected',
+        sessionId: payload.sessionId,
+        playerName: payload.playerName,
+        denyReason: ''
+      }));
+      gateway.requestPresenceList();
+      void setupWebRtc().catch((error) => {
+        // 中文注释：初始化失败时保留信令可用，仅关闭语音能力并标记权限状态。
+        console.warn('[SignalingService] setupWebRtc failed', error);
+        setState((prev) => ({
+          ...prev,
+          audioEnabled: false,
+          microphoneGranted: false
+        }));
+      });
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('connect:denied', (payload) => {
+      setState((prev) => ({
+        ...prev,
+        status: 'denied',
+        denyReason: payload.reason,
+        sessionId: ''
+      }));
+
+      // 中文注释：TOKEN_EXPIRED 时触发重新验证回调
+      if (payload.reason === TOKEN_EXPIRED && options?.onTokenExpired) {
+        options.onTokenExpired();
+      }
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('presence:nearby', (payload) => {
+      setState((prev) => ({
+        ...prev,
+        nearbyPlayers: payload.players
+      }));
+      handleNearbyPlayersUpdate(payload.players);
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('webrtc:offer', (payload: WebRtcSignalRelayPayload) => {
+      if (!isRtcSessionDescription(payload.data)) {
+        return;
+      }
+      const playerName = resolvePeerName(payload.fromSessionId);
+      setState((prev) => ({
+        ...prev,
+        peerStates: {
+          ...prev.peerStates,
+          [payload.fromSessionId]: {
+            ...ensurePeerState(payload.fromSessionId, playerName),
+            playerName,
+            phase: 'offer-received'
+          }
+        }
+      }));
+      if (!manager) {
+        return;
+      }
+      void manager.handleOffer({
+        fromSessionId: payload.fromSessionId,
+        playerName,
+        offer: payload.data
+      });
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('webrtc:answer', (payload: WebRtcSignalRelayPayload) => {
+      if (!isRtcSessionDescription(payload.data)) {
+        return;
+      }
+      setState((prev) => {
+        const peer = ensurePeerState(
+          payload.fromSessionId,
+          resolvePeerName(payload.fromSessionId)
+        );
+        return {
+          ...prev,
+          peerStates: {
+            ...prev.peerStates,
+            [payload.fromSessionId]: { ...peer, phase: 'connected' }
+          }
+        };
+      });
+      if (!manager) {
+        return;
+      }
+      void manager.handleAnswer({
+        fromSessionId: payload.fromSessionId,
+        answer: payload.data
+      });
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('webrtc:candidate', (payload: WebRtcSignalRelayPayload) => {
+      if (!isRtcIceCandidate(payload.data)) {
+        return;
+      }
+      setState((prev) => {
+        const peer = ensurePeerState(
+          payload.fromSessionId,
+          resolvePeerName(payload.fromSessionId)
+        );
+        return {
+          ...prev,
+          peerStates: {
+            ...prev.peerStates,
+            [payload.fromSessionId]: { ...peer, hasCandidate: true }
+          }
+        };
+      });
+      if (!manager) {
+        return;
+      }
+      void manager.handleCandidate({
+        fromSessionId: payload.fromSessionId,
+        candidate: payload.data
+      });
+    })
+  );
+
+  eventCleanups.push(
+    gateway.on('disconnect', () => {
+      manager?.disconnectAll();
+      manager = null;
+      audioService.cleanup();
+      setState((prev) => ({
+        ...prev,
+        status: 'disconnected',
+        sessionId: '',
+        nearbyPlayers: [],
+        peerStates: {},
         audioEnabled: false,
         microphoneGranted: false
       }));
-    });
-  });
-
-  gateway.on('connect:denied', (payload) => {
-    setState((prev) => ({
-      ...prev,
-      status: 'denied',
-      denyReason: payload.reason,
-      sessionId: ''
-    }));
-  });
-
-  gateway.on('presence:nearby', (payload) => {
-    setState((prev) => ({
-      ...prev,
-      nearbyPlayers: payload.players
-    }));
-    handleNearbyPlayersUpdate(payload.players);
-  });
-
-  gateway.on('webrtc:offer', (payload: WebRtcSignalRelayPayload) => {
-    if (!isRtcSessionDescription(payload.data)) {
-      return;
-    }
-    const playerName = resolvePeerName(payload.fromSessionId);
-    setState((prev) => ({
-      ...prev,
-      peerStates: {
-        ...prev.peerStates,
-        [payload.fromSessionId]: {
-          ...ensurePeerState(payload.fromSessionId, playerName),
-          playerName,
-          phase: 'offer-received'
-        }
-      }
-    }));
-    if (!manager) {
-      return;
-    }
-    void manager.handleOffer({
-      fromSessionId: payload.fromSessionId,
-      playerName,
-      offer: payload.data
-    });
-  });
-
-  gateway.on('webrtc:answer', (payload: WebRtcSignalRelayPayload) => {
-    if (!isRtcSessionDescription(payload.data)) {
-      return;
-    }
-    setState((prev) => {
-      const peer = ensurePeerState(
-        payload.fromSessionId,
-        resolvePeerName(payload.fromSessionId)
-      );
-      return {
-        ...prev,
-        peerStates: {
-          ...prev.peerStates,
-          [payload.fromSessionId]: { ...peer, phase: 'connected' }
-        }
-      };
-    });
-    if (!manager) {
-      return;
-    }
-    void manager.handleAnswer({
-      fromSessionId: payload.fromSessionId,
-      answer: payload.data
-    });
-  });
-
-  gateway.on('webrtc:candidate', (payload: WebRtcSignalRelayPayload) => {
-    if (!isRtcIceCandidate(payload.data)) {
-      return;
-    }
-    setState((prev) => {
-      const peer = ensurePeerState(
-        payload.fromSessionId,
-        resolvePeerName(payload.fromSessionId)
-      );
-      return {
-        ...prev,
-        peerStates: {
-          ...prev.peerStates,
-          [payload.fromSessionId]: { ...peer, hasCandidate: true }
-        }
-      };
-    });
-    if (!manager) {
-      return;
-    }
-    void manager.handleCandidate({
-      fromSessionId: payload.fromSessionId,
-      candidate: payload.data
-    });
-  });
-
-  gateway.on('disconnect', () => {
-    manager?.disconnectAll();
-    manager = null;
-    audioService.cleanup();
-    setState((prev) => ({
-      ...prev,
-      status: 'disconnected',
-      sessionId: '',
-      nearbyPlayers: [],
-      peerStates: {},
-      audioEnabled: false,
-      microphoneGranted: false
-    }));
-  });
+    })
+  );
 
   return {
     getState() {
@@ -413,7 +464,7 @@ export function createSignalingService(
         listeners.delete(listener);
       };
     },
-    join(playerName, code) {
+    join(playerName, token) {
       // 中文注释：join 入口统一设置连接中状态，便于 UI 可观测。
       manager?.disconnectAll();
       audioService.cleanup();
@@ -428,10 +479,45 @@ export function createSignalingService(
         microphoneGranted: false
       }));
       gateway.connect();
-      gateway.join(playerName, code);
+      gateway.join(playerName, token);
+    },
+    /**
+     * 使用 forceReplace=true 重新加入，用于处理 FORCE_REPLACE_REQUIRED 拒绝
+     */
+    retryWithForceReplace() {
+      gateway.retryWithForceReplace();
+      // 中文注释：重试时重置为连接中状态
+      setState((prev) => ({
+        ...prev,
+        status: 'connecting',
+        denyReason: ''
+      }));
     },
     disconnect() {
       gateway.disconnect();
+    },
+    /**
+     * 销毁服务，清理所有事件监听器，防止内存泄漏
+     */
+    dispose() {
+      // 中文注释：执行所有事件监听器的清理函数
+      eventCleanups.forEach((cleanup) => cleanup());
+      eventCleanups.length = 0;
+      // 中文注释：清理 manager 和 audioService
+      manager?.disconnectAll();
+      manager = null;
+      audioService.cleanup();
+      // 中文注释：清空状态
+      listeners.clear();
+      setState((prev) => ({
+        ...prev,
+        status: 'disconnected',
+        sessionId: '',
+        nearbyPlayers: [],
+        peerStates: {},
+        audioEnabled: false,
+        microphoneGranted: false
+      }));
     },
     requestPresence() {
       gateway.requestPresenceList();

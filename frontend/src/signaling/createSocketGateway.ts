@@ -1,8 +1,5 @@
 import { io, type Socket } from 'socket.io-client';
-import type {
-  ClientToServerEvents,
-  ServerToClientEvents
-} from '../../../shared/src/types/signaling.js';
+import type { ServerToClientEvents } from '@mcbewebrtc/shared';
 import type { SocketGateway } from './SocketGateway';
 
 /**
@@ -49,6 +46,11 @@ export function createSocketGateway(
       })
     );
 
+  // 中文注释：保存最后一次 join 的参数，用于 forceReplace 重试
+  let lastJoinParams: { playerName: string; token?: string } = {
+    playerName: ''
+  };
+
   return {
     connect() {
       client.connect();
@@ -56,16 +58,43 @@ export function createSocketGateway(
     disconnect() {
       client.disconnect();
     },
-    join(playerName, code) {
-      const payload: ClientToServerEvents['client:join'] extends (
-        arg: infer T
-      ) => void
-        ? T
-        : never = {
-        playerName,
-        ...(code ? { code } : {})
-      };
+    /**
+     * 加入游戏房间，支持 token 认证
+     * @param playerName 玩家名称
+     * @param token JWT 令牌（可选，用于令牌化加入）
+     * @param forceReplace 是否强制替换已在线的连接
+     */
+    join(playerName: string, token?: string, forceReplace?: boolean) {
+      // 中文注释：保存参数用于 forceReplace 重试
+      lastJoinParams = { playerName, token };
+
+      const payload: {
+        playerName: string;
+        token?: string;
+        forceReplace?: boolean;
+      } = { playerName };
+
+      // 中文注释：只有当 token 存在时才添加到 payload
+      if (token) {
+        payload.token = token;
+      }
+
+      // 中文注释：只有明确传 forceReplace=true 时才发送
+      if (forceReplace === true) {
+        payload.forceReplace = true;
+      }
+
       client.emit('client:join', payload);
+    },
+    /**
+     * 使用 forceReplace=true 重新加入，用于处理 FORCE_REPLACE_REQUIRED 拒绝
+     */
+    retryWithForceReplace() {
+      const { playerName, token } = lastJoinParams;
+      if (!playerName) {
+        return;
+      }
+      this.join(playerName, token, true);
     },
     requestPresenceList() {
       client.emit('presence:list:req');

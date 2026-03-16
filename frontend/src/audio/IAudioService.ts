@@ -1,4 +1,4 @@
-import type { PositionDto } from '../../../shared/src/types/presence.js';
+import type { PositionDto } from '@mcbewebrtc/shared';
 
 export interface IAudioService {
   initialize(): Promise<void>;

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/App';
 import { createSignalingService } from '../../src/signaling/createSignalingService';
+import type { ConnectDeniedReason } from '@mcbewebrtc/shared';
 import type {
   GatewayEventMap,
   SocketGateway
@@ -13,6 +14,8 @@ class FakeGateway implements SocketGateway {
   private handlers: Partial<
     Record<keyof GatewayEventMap, Array<(payload: unknown) => void>>
   > = {};
+  // 用于保存上次 join 的参数
+  private lastJoinParams: { playerName: string; token?: string } = { playerName: '' };
 
   connect(): void {
     this.sent.push({ event: 'connect' });
@@ -22,7 +25,16 @@ class FakeGateway implements SocketGateway {
     this.emit('disconnect', undefined);
   }
   join(playerName: string): void {
+    this.lastJoinParams = { playerName };
     this.sent.push({ event: 'client:join', payload: { playerName } });
+  }
+  // 用于测试 retryWithForceReplace 方法
+  retryWithForceReplace(): void {
+    const { playerName, token } = this.lastJoinParams;
+    this.sent.push({
+      event: 'client:join',
+      payload: { playerName, token, forceReplace: true }
+    });
   }
   requestPresenceList(): void {
     this.sent.push({ event: 'presence:list:req' });
@@ -112,5 +124,73 @@ describe('App MVP flow', () => {
       expect(screen.getByTestId('status')).toHaveTextContent('disconnected');
       expect(screen.getByTestId('session')).toHaveTextContent('-');
     });
+  });
+
+  it.each<ConnectDeniedReason>([
+    'TOKEN_INVALID',
+    'TOKEN_EXPIRED',
+    'TOKEN_REVOKED',
+    'TOKEN_MISSING',
+    'TOKEN_PLAYER_MISMATCH'
+  ])('收到 %s 时应提示重新验证', async (reason) => {
+    const user = userEvent.setup();
+    const gateway = new FakeGateway();
+    const service = createSignalingService(gateway);
+
+    render(<App service={service} />);
+
+    await user.type(screen.getByLabelText('昵称'), 'Alice');
+    await user.click(screen.getByRole('button', { name: '加入' }));
+    gateway.emit('connect:denied', { reason });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Token 已过期，请重新验证');
+      expect(screen.getByTestId('status')).toHaveTextContent('denied');
+    });
+  });
+
+  it('收到 FORCE_REPLACE_REQUIRED 时应展示强制替换并触发重试', async () => {
+    const user = userEvent.setup();
+    const gateway = new FakeGateway();
+    const service = createSignalingService(gateway);
+
+    render(<App service={service} />);
+
+    await user.type(screen.getByLabelText('昵称'), 'Alice');
+    await user.click(screen.getByRole('button', { name: '加入' }));
+    gateway.emit('connect:denied', { reason: 'FORCE_REPLACE_REQUIRED' });
+
+    await waitFor(() => {
+      expect(screen.getByText('该玩家已在线，是否强制替换？')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '强制替换' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: '强制替换' }));
+
+    expect(gateway.sent).toContainEqual({
+      event: 'client:join',
+      payload: { playerName: 'Alice', token: undefined, forceReplace: true }
+    });
+  });
+
+  it('不应依赖 INVALID_TOKEN 分支', async () => {
+    const user = userEvent.setup();
+    const gateway = new FakeGateway();
+    const service = createSignalingService(gateway);
+
+    render(<App service={service} />);
+
+    await user.type(screen.getByLabelText('昵称'), 'Alice');
+    await user.click(screen.getByRole('button', { name: '加入' }));
+    gateway.emit('connect:denied', {
+      reason: 'INVALID_TOKEN' as unknown as ConnectDeniedReason
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('denied');
+    });
+    expect(
+      screen.queryByText('Token 已过期，请重新验证')
+    ).not.toBeInTheDocument();
   });
 });

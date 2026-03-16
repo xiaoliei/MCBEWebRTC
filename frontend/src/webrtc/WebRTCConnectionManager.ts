@@ -1,4 +1,4 @@
-import type { NearbyPlayerDto } from '../../../shared/src/types/presence.js';
+import type { NearbyPlayerDto } from '@mcbewebrtc/shared';
 import type { IAudioService } from '../audio/IAudioService';
 import { PeerConnection } from './PeerConnection';
 
