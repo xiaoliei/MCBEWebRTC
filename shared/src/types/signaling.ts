@@ -2,7 +2,9 @@ import type { NearbyPlayerDto, PositionDto } from "./presence.js";
 
 export interface ClientJoinPayload {
   playerName: string;
-  code?: string;
+  // 令牌化加入语义：使用 token + forceReplace 替代旧 code 重连流程。
+  token?: string;
+  forceReplace?: boolean;
 }
 
 export interface BridgePositionUpdatePayload {
@@ -24,8 +26,19 @@ export interface WebRtcSignalRelayPayload {
 
 export type ConnectDeniedReason =
   | "DUPLICATE_NAME"
-  | "INVALID_CODE"
-  | "INVALID_PAYLOAD";
+  | "INVALID_PAYLOAD"
+  | "RATE_LIMITED"
+  | "BRIDGE_UNAVAILABLE"
+  | "INVALID_VERIFICATION"
+  // 令牌化加入语义下的拒绝原因（逐步替代旧 code 语义）。
+  | "TOKEN_MISSING"
+  | "TOKEN_INVALID"
+  | "TOKEN_EXPIRED"
+  | "TOKEN_REVOKED"
+  | "TOKEN_PLAYER_MISMATCH"
+  | "PLAYER_ALREADY_ONLINE"
+  | "FORCE_REPLACE_REQUIRED"
+  | "UNAUTHORIZED_REPLACEMENT";
 
 export interface ConnectDeniedPayload {
   reason: ConnectDeniedReason;
@@ -33,6 +46,15 @@ export interface ConnectDeniedPayload {
 }
 
 export interface PresenceListResponsePayload {
+  players: NearbyPlayerDto[];
+}
+
+export interface ConnectedPayload {
+  sessionId: string;
+  playerName: string;
+}
+
+export interface PresenceNearbyEventPayload {
   players: NearbyPlayerDto[];
 }
 
@@ -52,9 +74,9 @@ export interface ClientToServerEvents {
 export interface ServerToClientEvents {
   "auth:accepted": () => void;
   "auth:rejected": (payload: AuthRejectedPayload) => void;
-  connected: (payload: { sessionId: string; playerName: string }) => void;
+  connected: (payload: ConnectedPayload) => void;
   "connect:denied": (payload: ConnectDeniedPayload) => void;
-  "presence:nearby": (payload: { players: NearbyPlayerDto[] }) => void;
+  "presence:nearby": (payload: PresenceNearbyEventPayload) => void;
   "presence:list:res": (payload: PresenceListResponsePayload) => void;
   "webrtc:offer": (payload: WebRtcSignalRelayPayload) => void;
   "webrtc:answer": (payload: WebRtcSignalRelayPayload) => void;

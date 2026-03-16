@@ -15,8 +15,8 @@ describe("signaling contracts", () => {
   });
 
   it("connectDenied 原因值受限", () => {
-    const reason: ConnectDeniedReason = "INVALID_CODE";
-    expect(reason).toBe("INVALID_CODE");
+    const reason: ConnectDeniedReason = "TOKEN_MISSING";
+    expect(reason).toBe("TOKEN_MISSING");
   });
 
   it("client 与 server 事件命名符合 domain:action 约定", () => {
