@@ -28,7 +28,40 @@ interface MinecraftTransformMessage {
   };
 }
 
+interface MinecraftPlayerMessageEvent {
+  header?: {
+    messagePurpose?: string;
+    eventName?: string; // 某些版本在这里
+  };
+  body?: {
+    eventName?: string; // 某些版本在这里
+    properties?: {
+      Message?: string;
+      Sender?: string;
+    };
+    // 某些版本直接在 body 下
+    message?: string;
+    sender?: string;
+  };
+}
+
+interface MinecraftCommandResponseMessage {
+  header?: {
+    messagePurpose?: string;
+    requestId?: string;
+  };
+  body?: {
+    statusCode?: number;
+  };
+}
+
 export class McGateway {
+  private static activeGateway: McGateway | null = null;
+
+  private static readonly playerMessageListeners = new Set<
+    (payload: { playerName: string; message: string }) => void
+  >();
+
   private readonly port: number;
 
   private readonly debug: boolean;
@@ -41,10 +74,31 @@ export class McGateway {
 
   private mcSocket: WebSocket | null = null;
 
+  private readonly pendingCommandByRequestId = new Map<
+    string,
+    (success: boolean) => void
+  >();
+
   public constructor(options: McGatewayOptions) {
     this.port = options.port;
     this.debug = options.debug;
     this.onPlayerTransform = options.onPlayerTransform;
+  }
+
+  public static getActiveGateway(): McGateway | null {
+    return McGateway.activeGateway;
+  }
+
+  public static addPlayerMessageListener(
+    listener: (payload: { playerName: string; message: string }) => void
+  ): void {
+    McGateway.playerMessageListeners.add(listener);
+  }
+
+  public static removePlayerMessageListener(
+    listener: (payload: { playerName: string; message: string }) => void
+  ): void {
+    McGateway.playerMessageListeners.delete(listener);
   }
 
   public start(): void {
@@ -58,6 +112,8 @@ export class McGateway {
       );
       throw error;
     }
+
+    McGateway.activeGateway = this;
 
     this.wss.on('connection', (socket) => {
       if (this.mcSocket && this.mcSocket !== socket) {
@@ -75,9 +131,19 @@ export class McGateway {
       }
 
       this.subscribePlayerTransform(socket);
+      this.subscribePlayerMessage(socket);
 
       socket.on('message', (rawMessage) => {
-        const payload = this.tryParseTransform(rawMessage.toString());
+        const raw = rawMessage.toString();
+
+        if (this.debug) {
+          console.log('[mcwss][gateway] received raw message:', raw);
+        }
+
+        this.tryHandleCommandResponse(raw);
+        this.tryHandlePlayerMessage(raw);
+
+        const payload = this.tryParseTransform(raw);
         if (!payload) {
           return;
         }
@@ -96,6 +162,10 @@ export class McGateway {
         if (this.mcSocket === socket) {
           this.mcSocket = null;
         }
+
+        // 中文注释：连接断开时将所有挂起命令标记失败，避免上游 Promise 永久悬挂。
+        this.resolveAllPendingCommands(false);
+
         if (this.debug) {
           console.log('[mcwss][gateway] disconnected');
         }
@@ -117,42 +187,52 @@ export class McGateway {
     }
     this.wss = null;
     this.mcSocket = null;
+    this.resolveAllPendingCommands(false);
+
+    if (McGateway.activeGateway === this) {
+      McGateway.activeGateway = null;
+    }
   }
 
-  // TODO: 本期未实现 mc.command 接收,保留接口供后续使用
   public sendCommand({
     commandLine,
     originType = 'player'
   }: {
     commandLine: string;
     originType?: string;
-  }): boolean {
+  }): Promise<boolean> {
     const socket = this.mcSocket;
     if (!socket) {
-      return false;
+      return Promise.resolve(false);
     }
 
-    try {
-      socket.send(
-        JSON.stringify({
-          body: {
-            origin: { type: originType },
-            commandLine,
-            version: 1
-          },
-          header: {
-            requestId: uuidv4(),
-            messagePurpose: 'commandRequest',
-            version: 1,
-            messageType: 'commandRequest'
-          }
-        })
-      );
-      return true;
-    } catch (error) {
-      console.error('[mcwss][gateway] failed to send command:', error);
-      return false;
-    }
+    const requestId = uuidv4();
+
+    return new Promise<boolean>((resolve) => {
+      this.pendingCommandByRequestId.set(requestId, resolve);
+
+      try {
+        socket.send(
+          JSON.stringify({
+            body: {
+              origin: { type: originType },
+              commandLine,
+              version: 1
+            },
+            header: {
+              requestId,
+              messagePurpose: 'commandRequest',
+              version: 1,
+              messageType: 'commandRequest'
+            }
+          })
+        );
+      } catch (error) {
+        this.pendingCommandByRequestId.delete(requestId);
+        console.error('[mcwss][gateway] failed to send command:', error);
+        resolve(false);
+      }
+    });
   }
 
   // 订阅玩家移动事件
@@ -173,6 +253,103 @@ export class McGateway {
     if (this.debug) {
       console.log('[mcwss][gateway] 已订阅 PlayerTravelled 事件');
     }
+  }
+
+  // 中文注释：手动鉴权依赖玩家聊天消息，网关在连接建立后订阅 PlayerMessage。
+  private subscribePlayerMessage(socket: WebSocket): void {
+    socket.send(
+      JSON.stringify({
+        header: {
+          version: 1,
+          requestId: uuidv4(),
+          messageType: 'commandRequest',
+          messagePurpose: 'subscribe'
+        },
+        body: {
+          eventName: 'PlayerMessage',
+          version: 1
+        }
+      })
+    );
+
+    if (this.debug) {
+      console.log('[mcwss][gateway] 已订阅 PlayerMessage 事件');
+    }
+  }
+
+  private tryHandlePlayerMessage(rawMessage: string): void {
+    let message: MinecraftPlayerMessageEvent;
+    try {
+      message = JSON.parse(rawMessage) as MinecraftPlayerMessageEvent;
+    } catch {
+      return;
+    }
+
+    if (message.header?.messagePurpose !== 'event') {
+      return;
+    }
+
+    // 处理某些版本 EventName 可能在 header 或 body 中的情况
+    const eventName = message.header?.eventName ?? message.body?.eventName;
+    if (eventName !== 'PlayerMessage') {
+      return;
+    }
+
+    const { body } = message;
+    if (!body) {
+      return;
+    }
+
+    // 优先从 properties 取，备选方案直接从 body 取
+    const playerName = (body.properties?.Sender ?? body.sender ?? '').trim();
+    const text = (body.properties?.Message ?? body.message ?? '').trim();
+
+    if (this.debug) {
+      console.log(
+        `[mcwss][gateway] 尝试转发消息: playerName="${playerName}", text="${text}"`
+      );
+    }
+
+    if (!playerName || !text) {
+      return;
+    }
+
+    for (const listener of McGateway.playerMessageListeners) {
+      listener({ playerName, message: text });
+    }
+  }
+
+  private tryHandleCommandResponse(rawMessage: string): void {
+    let message: MinecraftCommandResponseMessage;
+    try {
+      message = JSON.parse(rawMessage) as MinecraftCommandResponseMessage;
+    } catch {
+      return;
+    }
+
+    if (message.header?.messagePurpose !== 'commandResponse') {
+      return;
+    }
+
+    const requestId = String(message.header.requestId ?? '').trim();
+    if (!requestId) {
+      return;
+    }
+
+    const resolver = this.pendingCommandByRequestId.get(requestId);
+    if (!resolver) {
+      return;
+    }
+
+    this.pendingCommandByRequestId.delete(requestId);
+    resolver(message.body?.statusCode === 0);
+  }
+
+  private resolveAllPendingCommands(success: boolean): void {
+    for (const resolve of this.pendingCommandByRequestId.values()) {
+      resolve(success);
+    }
+    this.pendingCommandByRequestId.clear();
   }
 
   private tryParseTransform(
