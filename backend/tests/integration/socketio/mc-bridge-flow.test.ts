@@ -6,7 +6,6 @@ import { createApp } from "../../../src/http/createApp.js";
 import { createSocketServer } from "../../../src/signaling/createSocketServer.js";
 import { StateStore } from "../../../src/domain/state/StateStore.js";
 import { SessionStore } from "../../../src/domain/session/SessionStore.js";
-import { ReconnectCodeStore } from "../../../src/domain/session/ReconnectCodeStore.js";
 
 describe("mc bridge flow", () => {
   let server: http.Server;
@@ -32,7 +31,6 @@ describe("mc bridge flow", () => {
       stores: {
         stateStore: new StateStore(),
         sessionStore: new SessionStore(),
-        reconnectCodeStore: new ReconnectCodeStore(),
       },
     });
 
@@ -77,7 +75,7 @@ describe("mc bridge flow", () => {
       badBridge,
       "auth:rejected",
     );
-    expect(rejected.reason).toBe("INVALID_TOKEN");
+    expect(rejected.reason).toBe("TOKEN_INVALID");
   });
 
   it("bridge 上报位置后 client 能收到 presence:nearby", async () => {

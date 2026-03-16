@@ -5,12 +5,10 @@ import { handleWebRtcRelay } from "../../../src/signaling/handlers/webrtcRelay.j
 import { handlePresenceListReq } from "../../../src/signaling/handlers/presence.js";
 import { SessionStore } from "../../../src/domain/session/SessionStore.js";
 import { StateStore } from "../../../src/domain/state/StateStore.js";
-import { ReconnectCodeStore } from "../../../src/domain/session/ReconnectCodeStore.js";
 
 describe("signaling handlers", () => {
-  it("client:join 成功后返回 connected", () => {
+  it("client:join 开启鉴权且未传 token 时返回 TOKEN_MISSING", () => {
     const sessionStore = new SessionStore();
-    const reconnectCodeStore = new ReconnectCodeStore();
     const emitSelf = vi.fn();
 
     const session = handleClientJoin(
@@ -18,23 +16,56 @@ describe("signaling handlers", () => {
       {
         socketId: "sock-1",
         sessionStore,
-        reconnectCodeStore,
         emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(),
+        },
+        createSessionId: () => "s-1",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session).toBeNull();
+    expect(emitSelf).toHaveBeenCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "TOKEN_MISSING" }),
+    );
+  });
+
+  it("client:join 有效 token 且无旧连接时成功", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "valid-token" },
+      {
+        socketId: "sock-1",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: true as const,
+            playerName: "Steve",
+            jti: "jti-1",
+          })),
+        },
         createSessionId: () => "s-1",
         nowProvider: () => 100,
       },
     );
 
     expect(session?.sessionId).toBe("s-1");
+    expect(session?.replacedSession).toBeNull();
     expect(emitSelf).toHaveBeenCalledWith("connected", {
       sessionId: "s-1",
       playerName: "Steve",
     });
   });
 
-  it("client:join 同名且无 code 时返回 DUPLICATE_NAME", () => {
+  it("client:join 有效 token 且玩家已在线但未传 forceReplace 时返回 FORCE_REPLACE_REQUIRED", () => {
     const sessionStore = new SessionStore();
-    const reconnectCodeStore = new ReconnectCodeStore();
     const emitSelf = vi.fn();
 
     sessionStore.createSession({
@@ -45,25 +76,257 @@ describe("signaling handlers", () => {
     });
 
     const session = handleClientJoin(
-      { playerName: "Steve" },
+      { playerName: "Steve", token: "valid-token" },
       {
         socketId: "sock-new",
         sessionStore,
-        reconnectCodeStore,
         emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: true as const,
+            playerName: "Steve",
+            jti: "jti-1",
+          })),
+        },
         createSessionId: () => "s-2",
-        generateReconnectCode: () => "654321",
         nowProvider: () => 100,
-        reconnectCodeTtlMs: 60_000,
       },
     );
 
     expect(session).toBeNull();
     expect(emitSelf).toHaveBeenCalledWith(
       "connect:denied",
-      expect.objectContaining({ reason: "DUPLICATE_NAME" }),
+      expect.objectContaining({ reason: "FORCE_REPLACE_REQUIRED" }),
     );
-    expect(reconnectCodeStore.getCode("Steve")?.code).toBe("654321");
+  });
+
+  it("client:join 有效 token 且 forceReplace=true 时替换旧连接", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    sessionStore.createSession({
+      sessionId: "old",
+      playerName: "Steve",
+      socketId: "sock-old",
+      connectedAt: 1,
+    });
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "valid-token", forceReplace: true },
+      {
+        socketId: "sock-new",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: true as const,
+            playerName: "Steve",
+            jti: "jti-1",
+          })),
+        },
+        createSessionId: () => "s-2",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session?.sessionId).toBe("s-2");
+    expect(session?.replacedSession).toEqual(
+      expect.objectContaining({
+        sessionId: "old",
+        playerName: "Steve",
+        socketId: "sock-old",
+      }),
+    );
+    expect(sessionStore.getById("old")).toBeNull();
+    expect(sessionStore.getById("s-2")).not.toBeNull();
+  });
+
+  it("client:join 关闭鉴权时 forceReplace=true 也可以替换旧连接", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    sessionStore.createSession({
+      sessionId: "old",
+      playerName: "Steve",
+      socketId: "sock-old",
+      connectedAt: 1,
+    });
+
+    const denied = handleClientJoin(
+      { playerName: "Steve" },
+      {
+        socketId: "sock-new",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: false,
+        createSessionId: () => "s-2",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(denied).toBeNull();
+    expect(emitSelf).toHaveBeenLastCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "FORCE_REPLACE_REQUIRED" }),
+    );
+
+    const joined = handleClientJoin(
+      { playerName: "Steve", forceReplace: true },
+      {
+        socketId: "sock-new",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: false,
+        createSessionId: () => "s-2",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(joined?.sessionId).toBe("s-2");
+    expect(joined?.replacedSession).toEqual(
+      expect.objectContaining({
+        sessionId: "old",
+        playerName: "Steve",
+      }),
+    );
+    expect(sessionStore.getById("old")).toBeNull();
+    expect(sessionStore.getById("s-2")).not.toBeNull();
+  });
+
+  it("client:join 无效 token 且 forceReplace=true 时返回 TOKEN_INVALID", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    sessionStore.createSession({
+      sessionId: "old",
+      playerName: "Steve",
+      socketId: "sock-old",
+      connectedAt: 1,
+    });
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "invalid-token", forceReplace: true },
+      {
+        socketId: "sock-new",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: false as const,
+            error: {
+              code: "TOKEN_INVALID" as const,
+              message: "token 无效",
+            },
+          })),
+        },
+        createSessionId: () => "s-2",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session).toBeNull();
+    expect(emitSelf).toHaveBeenCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "TOKEN_INVALID" }),
+    );
+    expect(sessionStore.getById("old")).not.toBeNull();
+  });
+
+  it("client:join 过期 token 时返回 TOKEN_EXPIRED", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "expired-token" },
+      {
+        socketId: "sock-1",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: false as const,
+            error: {
+              code: "TOKEN_EXPIRED" as const,
+              message: "token 已过期",
+            },
+          })),
+        },
+        createSessionId: () => "s-1",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session).toBeNull();
+    expect(emitSelf).toHaveBeenCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "TOKEN_EXPIRED" }),
+    );
+  });
+
+  it("client:join 被撤销 token 时返回 TOKEN_REVOKED", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "revoked-token" },
+      {
+        socketId: "sock-1",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: false as const,
+            error: {
+              code: "TOKEN_REVOKED" as const,
+              message: "token 未在白名单中生效",
+            },
+          })),
+        },
+        createSessionId: () => "s-1",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session).toBeNull();
+    expect(emitSelf).toHaveBeenCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "TOKEN_REVOKED" }),
+    );
+  });
+
+  it("client:join token 中 playerName 与 join 不一致时返回 TOKEN_PLAYER_MISMATCH", () => {
+    const sessionStore = new SessionStore();
+    const emitSelf = vi.fn();
+
+    const session = handleClientJoin(
+      { playerName: "Steve", token: "valid-token", forceReplace: true },
+      {
+        socketId: "sock-1",
+        sessionStore,
+        emitSelf,
+        requirePlayerTokenAuth: true,
+        playerAuthService: {
+          validatePlayerToken: vi.fn(() => ({
+            ok: true as const,
+            playerName: "Alex",
+            jti: "jti-1",
+          })),
+        },
+        createSessionId: () => "s-1",
+        nowProvider: () => 100,
+      },
+    );
+
+    expect(session).toBeNull();
+    expect(emitSelf).toHaveBeenCalledWith(
+      "connect:denied",
+      expect.objectContaining({ reason: "TOKEN_PLAYER_MISMATCH" }),
+    );
   });
 
   it("bridge:position:update 会更新状态", () => {

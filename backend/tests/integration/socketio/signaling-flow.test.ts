@@ -6,7 +6,6 @@ import { createApp } from "../../../src/http/createApp.js";
 import { createSocketServer } from "../../../src/signaling/createSocketServer.js";
 import { StateStore } from "../../../src/domain/state/StateStore.js";
 import { SessionStore } from "../../../src/domain/session/SessionStore.js";
-import { ReconnectCodeStore } from "../../../src/domain/session/ReconnectCodeStore.js";
 
 describe("socket.io signaling flow", () => {
   let server: http.Server;
@@ -32,7 +31,6 @@ describe("socket.io signaling flow", () => {
       stores: {
         stateStore: new StateStore(),
         sessionStore: new SessionStore(),
-        reconnectCodeStore: new ReconnectCodeStore(),
       },
     });
 
@@ -72,7 +70,7 @@ describe("socket.io signaling flow", () => {
       badBridge,
       "auth:rejected",
     );
-    expect(badRejected.reason).toBe("INVALID_TOKEN");
+    expect(badRejected.reason).toBe("TOKEN_INVALID");
 
     const bridge = createClient(baseUrl, {
       auth: {
@@ -121,14 +119,16 @@ describe("socket.io signaling flow", () => {
     );
 
     const offerPayload = { sdp: "mock-offer" };
+    // 先监听再发送，避免事件极快到达导致测试偶发丢包。
+    const forwardedOfferPromise = waitForEvent<{
+      fromSessionId: string;
+      data: { sdp: string };
+    }>(clientB, "webrtc:offer");
     clientA.emit("webrtc:offer", {
       toSessionId: bConnected.sessionId,
       data: offerPayload,
     });
-    const forwardedOffer = await waitForEvent<{
-      fromSessionId: string;
-      data: { sdp: string };
-    }>(clientB, "webrtc:offer");
+    const forwardedOffer = await forwardedOfferPromise;
     expect(forwardedOffer.fromSessionId).toBe(aConnected.sessionId);
     expect(forwardedOffer.data).toEqual(offerPayload);
   });

@@ -15,6 +15,13 @@ export interface PresenceListResponsePayload {
   players: NearbyPlayerDto[];
 }
 
+export interface ClientJoinPayload {
+  playerName: string;
+  // 令牌化加入语义：使用 token + forceReplace 替代旧 code 重连流程。
+  token?: string;
+  forceReplace?: boolean;
+}
+
 export interface BridgePositionUpdatePayload {
   playerName: string;
   playerId?: string | null;
@@ -32,10 +39,9 @@ export interface WebRtcSignalRelayPayload {
   data: unknown;
 }
 
-export type ConnectDeniedReason =
-  | "DUPLICATE_NAME"
-  | "INVALID_CODE"
-  | "INVALID_PAYLOAD";
+import type { ConnectDeniedReason } from '@mcbewebrtc/shared';
+
+export type { ConnectDeniedReason } from '@mcbewebrtc/shared';
 
 export interface ConnectDeniedPayload {
   reason: ConnectDeniedReason;

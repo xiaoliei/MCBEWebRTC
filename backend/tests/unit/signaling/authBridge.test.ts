@@ -39,7 +39,7 @@ describe("authBridge", () => {
   it("缺失 token 认证失败", () => {
     const result = authBridge(createBridgeSocket(""), SECRET);
     expect(result.authorized).toBe(false);
-    expect(result.rejectReason).toBe("MISSING_TOKEN");
+    expect(result.rejectReason).toBe("TOKEN_MISSING");
   });
 
   it("错误签名认证失败", () => {
@@ -54,6 +54,6 @@ describe("authBridge", () => {
 
     const result = authBridge(createBridgeSocket(token), SECRET);
     expect(result.authorized).toBe(false);
-    expect(result.rejectReason).toBe("INVALID_TOKEN");
+    expect(result.rejectReason).toBe("TOKEN_INVALID");
   });
 });
