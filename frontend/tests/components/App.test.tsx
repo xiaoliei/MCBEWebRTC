@@ -3,6 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/App';
 import { createSignalingService } from '../../src/signaling/createSignalingService';
+import type {
+  SignalingService,
+  SignalingState
+} from '../../src/signaling/createSignalingService';
 import type { ConnectDeniedReason } from '@mcbewebrtc/shared';
 import type {
   GatewayEventMap,
@@ -71,7 +75,74 @@ class FakeGateway implements SocketGateway {
   }
 }
 
+function createStaticService(state: SignalingState): SignalingService {
+  return {
+    getState() {
+      return state;
+    },
+    subscribe() {
+      return () => {};
+    },
+    join() {},
+    retryWithForceReplace() {},
+    disconnect() {},
+    dispose() {},
+    requestPresence() {},
+    sendOffer() {},
+    sendAnswer() {},
+    sendCandidate() {}
+  };
+}
+
 describe('App MVP flow', () => {
+  it('展示验证与操作区和状态信息区标题', () => {
+    const service = createStaticService({
+      status: 'idle',
+      sessionId: '',
+      playerName: '',
+      nearbyPlayers: [],
+      denyReason: '',
+      peerStates: {},
+      audioEnabled: false,
+      microphoneGranted: false
+    });
+
+    render(<App service={service} />);
+
+    expect(
+      screen.getByRole('heading', { name: '验证与操作', level: 2 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: '状态信息', level: 2 })
+    ).toBeInTheDocument();
+  });
+
+  it('使用文本徽章而不是 emoji 展示远端音频状态', () => {
+    const service = createStaticService({
+      status: 'connected',
+      sessionId: 's-1',
+      playerName: 'Alice',
+      nearbyPlayers: [],
+      denyReason: '',
+      peerStates: {
+        's-2': {
+          phase: 'connected',
+          hasCandidate: true,
+          iceConnectionState: 'connected',
+          hasRemoteTrack: true,
+          playerName: 'Bob'
+        }
+      },
+      audioEnabled: true,
+      microphoneGranted: true
+    });
+
+    render(<App service={service} />);
+
+    expect(screen.getByText('音频中')).toBeInTheDocument();
+    expect(screen.queryByText('🎧')).not.toBeInTheDocument();
+  });
+
   it('输入昵称并加入后展示 connected/sessionId 与 nearby 列表', async () => {
     const user = userEvent.setup();
     const gateway = new FakeGateway();
