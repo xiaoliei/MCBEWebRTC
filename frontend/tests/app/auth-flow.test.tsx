@@ -210,7 +210,8 @@ describe('auth flow', () => {
 
     // 展示等待态（等待游戏中输入 #验证码）
     await waitFor(() => {
-      expect(screen.getByText('请在游戏中发送 #654321')).toBeInTheDocument();
+      expect(screen.getByText('请在游戏中发送以下指令')).toBeInTheDocument();
+      expect(screen.getByText('/tell @s #654321')).toBeInTheDocument();
     });
 
     // 点击确认（假设已在游戏中发送）
@@ -224,6 +225,44 @@ describe('auth flow', () => {
         payload: { playerName: 'Alex', token: 'jwt-token-manual' }
       });
     });
+  });
+  it('manual flow supports one-click copying', async () => {
+    const user = userEvent.setup();
+    const { service } = createTestContext();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText }
+    });
+
+    const { startManualVerification } = await import('../../src/network/auth');
+    const { getToken } = await import('../../src/signaling/authTokenStore');
+
+    vi.mocked(startManualVerification).mockResolvedValue({
+      ok: true,
+      code: '654321',
+      challenge: '#654321',
+      ttlMs: 120000,
+      expiresAt: Date.now() + 120000
+    });
+    vi.mocked(getToken).mockReturnValue(null);
+
+    render(<App service={service} />);
+
+    await user.click(screen.getByRole('radio', { name: /manual/i }));
+    await user.type(screen.getByRole('textbox'), 'Alex');
+    await user.click(screen.getAllByRole('button')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText('请在游戏中发送以下指令')).toBeInTheDocument();
+      expect(screen.getByText('/tell @s #654321')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'copy-manual-code' }));
+
+    expect(writeText).toHaveBeenCalledWith('/tell @s #654321');
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   it('token 过期或 join 被拒绝时提示重新验证', async () => {

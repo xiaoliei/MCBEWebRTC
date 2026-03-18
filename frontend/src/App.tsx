@@ -76,6 +76,9 @@ export function App({
     challenge: '',
     error: ''
   });
+  const [manualCopyState, setManualCopyState] = useState<'idle' | 'copied' | 'error'>(
+    'idle'
+  );
 
   useEffect(() => {
     // 中文注释：订阅服务状态，组件仅负责展示，不直接操作 socket。
@@ -88,6 +91,7 @@ export function App({
     if (!trimmedName) {
       return;
     }
+    setManualCopyState('idle');
 
     setAuthState((prev) => ({
       ...prev,
@@ -206,10 +210,30 @@ export function App({
     service.retryWithForceReplace();
   };
 
+  const handleCopyManualCode = async () => {
+    const text = authState.challenge || authState.code;
+    if (!text) {
+      return;
+    }
+    const command = `/tell @s ${text}`;
+
+    if (!navigator.clipboard?.writeText) {
+      setManualCopyState('error');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(command);
+      setManualCopyState('copied');
+    } catch {
+      setManualCopyState('error');
+    }
+  };
   // 处理断开
   const handleDisconnect = () => {
     service.disconnect();
     clearToken();
+    setManualCopyState('idle');
     setAuthState({
       mode: 'tell',
       step: 'idle',
@@ -266,14 +290,15 @@ export function App({
           <RadioGroup
             legend="验证方式"
             name="verification-mode"
-            onChange={(value) =>
+            onChange={(value) => {
+              setManualCopyState('idle');
               setAuthState((prev) => ({
                 ...prev,
                 mode: value,
                 step: 'idle',
                 error: ''
-              }))
-            }
+              }));
+            }}
             options={[
               { value: 'tell', label: '验证码(tell)' },
               { value: 'manual', label: '手动(manual)' }
@@ -328,8 +353,32 @@ export function App({
           ) : null}
 
           {authState.step === 'waiting-confirm' ? (
-            <Panel className="app-callout" variant="accent">
-              <p>{`请在游戏中发送 ${authState.challenge}`}</p>
+            <Panel className="app-callout app-callout--manual" variant="accent">
+              <p>{`请在游戏中发送以下指令`}</p>
+              <div className="app-manual-copy__row">
+                <code className="app-manual-copy__code">/tell @s {authState.challenge}</code>
+                <Button
+                  aria-label="copy-manual-code"
+                  onClick={handleCopyManualCode}
+                  variant="secondary"
+                >
+                  复制指令
+                </Button>
+              </div>
+              {manualCopyState !== 'idle' ? (
+                <p
+                  className={`app-manual-copy__feedback ${
+                    manualCopyState === 'error'
+                      ? 'app-manual-copy__feedback--error'
+                      : ''
+                  }`}
+                  role="status"
+                >
+                  {manualCopyState === 'copied'
+                    ? '已复制到剪贴板'
+                    : '复制失败，请手动复制'}
+                </p>
+              ) : null}
               <Button onClick={handleConfirmVerification}>确认</Button>
             </Panel>
           ) : null}
