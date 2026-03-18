@@ -246,12 +246,12 @@ export class McGateway {
           messagePurpose: 'subscribe'
         },
         body: {
-          eventName: 'PlayerTravelled'
+          eventName: 'PlayerTransform'
         }
       })
     );
     if (this.debug) {
-      console.log('[mcwss][gateway] 已订阅 PlayerTravelled 事件');
+      console.log('[mcwss][gateway] 已订阅 PlayerTransform 事件');
     }
   }
 
@@ -366,7 +366,7 @@ export class McGateway {
     }
 
     // 验证是否为玩家移动事件
-    if (message.header?.eventName !== 'PlayerTravelled') {
+    if (message.header?.eventName !== 'PlayerTransform') {
       return null;
     }
 
