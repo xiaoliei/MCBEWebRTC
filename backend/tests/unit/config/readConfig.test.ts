@@ -29,7 +29,24 @@ describe("readConfig", () => {
       expect(config.jwtExpiresIn).toBe("2h");
       expect(config.iceServers).toEqual([{ urls: "stun:stun.l.google.com:19302" }]);
       expect(config.authVerificationEnabled).toBe(true);
+      expect(config.callRadius).toBe(16);
       expect(config.authManual.messagePrefix).toBe("#");
+    });
+  });
+
+  describe("CALL_RADIUS", () => {
+    it("uses custom radius from env", () => {
+      const config = readConfig(createBaseEnv({ CALL_RADIUS: "24" }));
+      expect(config.callRadius).toBe(24);
+    });
+
+    it("throws on invalid radius", () => {
+      expect(() => readConfig(createBaseEnv({ CALL_RADIUS: "0" }))).toThrowError(
+        /CALL_RADIUS/,
+      );
+      expect(() => readConfig(createBaseEnv({ CALL_RADIUS: "abc" }))).toThrowError(
+        /CALL_RADIUS/,
+      );
     });
   });
 

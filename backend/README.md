@@ -43,3 +43,9 @@ ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"}]
 ```bash
 npm test
 ```
+
+## Proximity Radius
+
+- Add `CALL_RADIUS` in `.env` to control the voice call radius.
+- Default: `16`
+- Example: `CALL_RADIUS=24`

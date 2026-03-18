@@ -36,6 +36,7 @@ export interface AppConfig {
   bridgeJwtSecret: string;
   jwtExpiresIn: string;
   iceServers: IceServerDto[];
+  callRadius: number;
   authVerificationEnabled: boolean;
   playerJwt: PlayerJwtConfig;
   authTell: AuthTellConfig;
@@ -49,6 +50,7 @@ const DEFAULT_ICE_SERVERS: IceServerDto[] = [
 
 const DEFAULT_DISABLED_PLAYER_JWT_SECRET = "player-auth-disabled-placeholder";
 const DEFAULT_DISABLED_PLAYER_JWT_EXPIRES_IN = "24h";
+const DEFAULT_CALL_RADIUS = 16;
 const DEFAULT_AUTH_TELL_CODE_TTL_MS = 120_000;
 const DEFAULT_AUTH_TELL_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_AUTH_TELL_RATE_LIMIT_MAX = 3;
@@ -95,6 +97,24 @@ function parsePositiveInt(rawValue: string | undefined, name: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new Error(`${name} 必须是正整数`);
+  }
+
+  return parsed;
+}
+
+function parsePositiveNumberWithDefault(
+  rawValue: string | undefined,
+  defaultValue: number,
+  name: string,
+): number {
+  const value = rawValue?.trim();
+  if (!value) {
+    return defaultValue;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive number`);
   }
 
   return parsed;
@@ -222,6 +242,11 @@ export function readConfig(
     bridgeJwtSecret: parseBridgeJwtSecret(env.BRIDGE_JWT_SECRET),
     jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN),
     iceServers: parseIceServers(env.ICE_SERVERS),
+    callRadius: parsePositiveNumberWithDefault(
+      env.CALL_RADIUS,
+      DEFAULT_CALL_RADIUS,
+      "CALL_RADIUS",
+    ),
     authVerificationEnabled,
     playerJwt: {
       secret: authVerificationEnabled

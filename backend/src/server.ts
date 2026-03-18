@@ -109,7 +109,7 @@ const { collectBridgeSockets } = createSocketServer({
   httpServer,
   options: {
     bridgeJwtSecret: config.bridgeJwtSecret,
-    callRadius: 16,
+    callRadius: config.callRadius,
     tickMs: 200,
     gamePlayerTtlMs: 30_000,
   },
