@@ -1,51 +1,82 @@
 # @mcbewebrtc/backend
 
-后端服务（Express + Socket.io），提供信令服务和 HTTP API。
+[← Back to Root](../README.md)
 
-## 开发
+Signaling server for MCBE WebRTC Voice Chat. Provides HTTP API, WebSocket signaling relay, proximity calculation, and player authentication.
+
+## Quick Start
 
 ```bash
 npm install
-npm run dev
+cp .env.example .env   # Configure BRIDGE_JWT_SECRET and PLAYER_JWT_SECRET
+npm run dev            # Development with hot reload
 ```
 
-默认监听：`http://0.0.0.0:3000`
+Default: `http://0.0.0.0:3000`
 
-## 构建与启动
+## Scripts
 
-```bash
-npm run build
-npm run start
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start in development mode (tsx watch) |
+| `npm run build` | Compile TypeScript |
+| `npm run start` | Start compiled server |
+| `npm test` | Run Vitest test suite |
+
+## Project Structure
+
+```
+src/
+├── config/       # Environment variable reading
+├── domain/       # Business logic
+│   ├── auth/     # Player auth, rate limiting, token whitelist
+│   ├── proximity/# Nearby player calculation
+│   ├── session/  # Connection session store
+│   └── state/    # Global state store
+├── http/         # Express app and routes
+│   └── routes/   # auth, ice
+├── signaling/    # Socket.IO server and event handlers
+│   ├── handlers/ # bridgePosition, clientJoin, presence, webrtcRelay
+│   └── middleware/# Bridge authentication
+├── utils/        # JWT helpers, safe event emitters
+└── server.ts     # Entry point
 ```
 
-## 环境变量
+## API Endpoints
 
-创建 `.env` 文件（可参考 `.env.example`）：
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/healthz` | Health check |
+| GET | `/api/ice` | ICE server configuration |
+| POST | `/api/auth/verify/tell/start` | Start tell-based verification |
+| POST | `/api/auth/verify/tell/finish` | Complete tell-based verification |
+| POST | `/api/auth/verify/manual/start` | Start manual verification |
+| POST | `/api/auth/verify/manual/confirm` | Confirm manual verification |
 
-- `PORT`：HTTP 服务器端口（默认 `3000`）
-- `HOST`：监听地址（默认 `0.0.0.0`）
-- `BRIDGE_JWT_SECRET`：网关 JWT 签名密钥（必须配置，不能使用占位符）
-- `JWT_EXPIRES_IN`：网关 JWT 有效期（默认 `2h`，示例：`30m`/`2h`/`1d`）
-- `ICE_SERVERS`：WebRTC ICE 服务器配置（JSON 数组格式，默认使用 Google STUN）
+## Environment Variables
 
-### 环境变量示例
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP server port |
+| `HOST` | `0.0.0.0` | Listen address |
+| `BRIDGE_JWT_SECRET` | *(required)* | JWT secret for MC gateway auth |
+| `JWT_EXPIRES_IN` | `2h` | Bridge JWT expiration |
+| `PLAYER_JWT_SECRET` | *(required)* | JWT secret for player sessions |
+| `PLAYER_JWT_EXPIRES_IN` | `24h` | Player JWT expiration |
+| `PLAYER_TOKEN_REFRESH_STRATEGY` | `none` | Token refresh strategy |
+| `ICE_SERVERS` | Google STUN | WebRTC ICE servers (JSON array) |
+| `CALL_RADIUS` | `16` | Voice call radius in blocks |
+| `AUTH_VERIFICATION_ENABLED` | `true` | Enable verification |
+| `AUTH_TELL_ENABLED` | `true` | Enable tell verification |
+| `AUTH_TELL_CODE_TTL_MS` | `120000` | Tell code TTL (ms) |
+| `AUTH_TELL_RATE_LIMIT_WINDOW_MS` | `60000` | Tell rate limit window (ms) |
+| `AUTH_TELL_RATE_LIMIT_MAX` | `3` | Tell rate limit max requests |
+| `AUTH_MANUAL_ENABLED` | `true` | Enable manual verification |
+| `AUTH_MANUAL_CODE_TTL_MS` | `300000` | Manual code TTL (ms) |
+| `AUTH_MANUAL_RATE_LIMIT_WINDOW_MS` | `60000` | Manual rate limit window (ms) |
+| `AUTH_MANUAL_RATE_LIMIT_MAX` | `3` | Manual rate limit max requests |
+| `AUTH_MANUAL_MESSAGE_PREFIX` | `#` | Manual verification message prefix |
+| `AUTH_TOKEN_CLEANUP_INTERVAL_MS` | `60000` | Token cleanup interval (ms) |
+| `AUTH_VERIFY_SESSION_CLEANUP_INTERVAL_MS` | `60000` | Verify session cleanup interval (ms) |
 
-```bash
-PORT=3000
-HOST=0.0.0.0
-BRIDGE_JWT_SECRET=your-secure-random-token-here
-JWT_EXPIRES_IN=2h
-ICE_SERVERS=[{"urls":"stun:stun.l.google.com:19302"}]
-```
-
-## 测试
-
-```bash
-npm test
-```
-
-## Proximity Radius
-
-- Add `CALL_RADIUS` in `.env` to control the voice call radius.
-- Default: `16`
-- Example: `CALL_RADIUS=24`
+See `.env.example` for a complete reference.

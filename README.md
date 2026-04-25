@@ -1,190 +1,217 @@
-# WebRTCForMCBE
+# MCBE WebRTC Voice Chat
 
-基于 WebRTC 的 Minecraft Bedrock Edition 距离语音通信系统。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-green.svg)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-## 项目结构
+A proximity-based voice chat system for **Minecraft Bedrock Edition**, powered by WebRTC peer-to-peer audio.
+
+Players in the same Minecraft world can hear each other based on their in-game distance. The closer you are, the louder they sound — just like real life.
+
+## Features
+
+- **Proximity Voice Chat** — WebRTC peer-to-peer audio with configurable call radius
+- **In-Game Position Tracking** — Real-time position updates via Minecraft WebSocket
+- **JWT Authentication** — Secure player verification with two modes:
+  - **Tell Verification**: Server sends a code to your in-game chat via `/tell`
+  - **Manual Verification**: Copy a verification code and paste it in-game chat
+- **Duplicate Name Protection** — Prevents impersonation with force-replace option
+- **Modular Architecture** — Separate backend, frontend, MC gateway, and shared packages
+
+## Architecture
 
 ```
-WebRTCForMCBE/
-├── backend/          # 后端服务（Express + Socket.io）
-├── mcwss/            # MC 网关（WebSocket 桥接）
-├── frontend/         # 浏览器客户端（React）
-├── shared/           # 共享类型定义
-└── demo/             # 简陋实现（Node.js 示例）
+┌─────────────┐     WebSocket      ┌─────────┐    Socket.IO     ┌─────────┐    Socket.IO    ┌──────────┐
+│  Minecraft   │ ◄──────────────► │  mcwss  │ ◄─────────────► │ backend │ ◄────────────► │ frontend │
+│  Bedrock Ed. │   /connect       │ (gateway)│                 │ (server)│                 │ (browser)│
+└─────────────┘                   └─────────┘                 └─────────┘                 └──────────┘
+                                        │                           │                          │
+                                 Position updates            Signaling relay           WebRTC P2P audio
+                                 (PlayerTransform)         + Proximity calc          (麦克风 → 耳机)
 ```
 
-## 快速开始
+**Data flow:**
+1. MC clients send `PlayerTransform` events to `mcwss` gateway via WebSocket
+2. `mcwss` forwards positions to `backend` via Socket.IO
+3. `backend` calculates nearby players and relays WebRTC signaling
+4. `frontend` establishes P2P audio connections with nearby players
 
-### 前置要求
+## Project Structure
 
-- Node.js >= 18
-- npm >= 9
+```
+MCBEWebRTC/
+├── backend/      # Signaling server (Express + Socket.IO)
+├── frontend/     # Browser client (React + Vite + WebRTC)
+├── mcwss/        # Minecraft WebSocket gateway (ws + Socket.IO client)
+├── shared/       # Shared TypeScript types
+└── demo/         # Legacy reference implementation (deprecated)
+```
 
-### 1. 安装依赖
+## Prerequisites
+
+- **Node.js** >= 18
+- **npm** >= 9
+- **Minecraft Bedrock Edition** with WebSocket support enabled
+
+## Quick Start
+
+### 1. Clone and Install
 
 ```bash
-# 安装所有子包依赖
-npm install
-# 或分别安装
-cd backend && npm install
-cd mcwss && npm install
-cd frontend && npm install
+git clone https://github.com/<your-username>/MCBEWebRTC.git
+cd MCBEWebRTC
+
+# Install dependencies for each package
+cd backend && npm install && cd ..
+cd mcwss && npm install && cd ..
+cd frontend && npm install && cd ..
+cd shared && npm install && cd ..
 ```
 
-### 2. 配置环境变量
-
-```bash
-# Backend 配置
-cd backend
-cp .env.example .env
-# 编辑 .env 文件，设置 BRIDGE_TOKEN 为强随机字符串
-
-# MC 网关配置
-cd ../mcwss
-cp .env.example .env
-# 编辑 .env 文件，确保 BRIDGE_TOKEN 与 backend 一致
-```
-
-**重要**：两个服务的 `BRIDGE_TOKEN` 必须保持一致，否则网关无法通过认证。
-
-### 3. 启动服务
-
-#### 开发模式（推荐）
-
-使用开发模式可启用热重载和详细日志：
-
-```bash
-# 终端 1：启动后端服务
-cd backend
-npm run dev
-
-# 终端 2：启动 MC 网关
-cd mcwss
-npm run dev
-
-# 终端 3：启动前端（可选）
-cd frontend
-npm run dev
-```
-
-#### 生产模式
-
-```bash
-# 构建后端
-cd backend
-npm run build
-npm run start
-
-# 构建 MC 网关
-cd mcwss
-npm run build
-npm run start
-```
-
-### 4. 访问服务
-
-- **后端 API**：`http://localhost:3000`
-- **MC 网关**：`ws://localhost:8000`
-- **前端界面**：`http://localhost:5173`（Vite 开发服务器）
-
-## 开发工作流
-
-### 运行测试
-
-```bash
-# Backend 测试
-cd backend && npm test
-
-# MC 网关测试
-cd mcwss && npm test
-```
-
-### 代码检查与格式化
+### 2. Configure Environment Variables
 
 ```bash
 # Backend
-cd backend && npm run lint
-cd backend && npm run format:fix
+cd backend
+cp .env.example .env
+# Edit .env — set BRIDGE_JWT_SECRET and PLAYER_JWT_SECRET to strong random strings
 
-# MC 网关
-cd mcwss && npm run lint
-cd mcwss && npm run format:fix
+# MC Gateway
+cd ../mcwss
+cp .env.example .env
+# Edit .env — set BRIDGE_JWT_SECRET (must match backend)
 ```
 
-## 架构说明
+**Important:** `BRIDGE_JWT_SECRET` must be identical in both `backend/.env` and `mcwss/.env`.
 
-### 后端服务 (`backend/`)
+### 3. Start Services
 
-提供 HTTP API 和 WebSocket 信令服务：
-
-- **端口**：3000（可通过 `PORT` 环境变量配置）
-- **主要功能**：
-  - WebSocket 信令中继
-  - 邻近玩家计算
-  - ICE 服务器配置
-  - 网关认证
-
-**环境变量**：
-- `PORT`：HTTP 服务器端口（默认 `3000`）
-- `HOST`：监听地址（默认 `0.0.0.0`）
-- `BRIDGE_TOKEN`：网关认证 token（必须配置）
-- `ICE_SERVERS`：WebRTC ICE 服务器 JSON 配置
-
-### MC 网关 (`mcwss/`)
-
-桥接 Minecraft WebSocket 和后端信令服务：
-
-- **端口**：8000（可通过 `GATEWAY_PORT` 环境变量配置）
-- **主要功能**：
-  - 接收 MC 的 `PlayerTransform` 事件
-  - 上报到后端信令服务
-  - 转发后端命令到 MC
-
-**环境变量**：
-- `BACKEND_URL`：后端服务地址（默认 `http://127.0.0.1:3000`）
-- `BRIDGE_TOKEN`：网关认证 token（必须与 backend 一致）
-- `GATEWAY_PORT`：网关监听端口（默认 `8000`）
-- `DEBUG`：调试日志开关（默认 `false`）
-
-### Demo 参考 (`demo/`)
-
-可运行的 Node.js 示例，包含完整的端到端实现：
+**Development mode** (with hot reload):
 
 ```bash
-cd demo
-npm install
-npm run start        # 启动信令服务
-npm run start:gateway  # 启动 MC 网关
+# Terminal 1: Backend
+cd backend && npm run dev
+
+# Terminal 2: MC Gateway
+cd mcwss && npm run dev
+
+# Terminal 3: Frontend (optional)
+cd frontend && npm run dev
 ```
 
-访问 `http://localhost:3000` 查看演示界面。
+**Production mode:**
 
-## 故障排查
+```bash
+cd shared && npm run build
+cd backend && npm run build && npm run start
+cd mcwss && npm run build && npm run start
+cd frontend && npm run build  # Static files in frontend/dist/
+```
 
-### 网关无法连接到后端
+### 4. Connect in Minecraft
 
-1. 检查后端服务是否运行：`curl http://localhost:3000`
-2. 检查 `BRIDGE_TOKEN` 是否一致
-3. 检查 `BACKEND_URL` 配置是否正确
+In Minecraft Bedrock Edition, enable WebSocket and connect to the gateway:
 
-### 环境变量未生效
+```
+/connect localhost:8000
+```
 
-确保 `.env` 文件位于正确的子包目录中（`backend/.env` 或 `mcwss/.env`）。
+Open `http://localhost:5173` in your browser, enter your player name, complete verification, and start chatting!
 
-### 端口被占用
+## Configuration
 
-修改对应服务的 `.env` 文件中的端口配置：
+### Backend Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP server port |
+| `HOST` | `0.0.0.0` | Listen address |
+| `BRIDGE_JWT_SECRET` | *(required)* | JWT secret for MC gateway auth |
+| `JWT_EXPIRES_IN` | `2h` | Bridge JWT expiration |
+| `PLAYER_JWT_SECRET` | *(required)* | JWT secret for player sessions |
+| `PLAYER_JWT_EXPIRES_IN` | `24h` | Player JWT expiration |
+| `ICE_SERVERS` | Google STUN | WebRTC ICE servers (JSON array) |
+| `CALL_RADIUS` | `16` | Voice call radius in blocks |
+| `AUTH_VERIFICATION_ENABLED` | `true` | Enable player verification |
+| `AUTH_TELL_ENABLED` | `true` | Enable tell-based verification |
+| `AUTH_MANUAL_ENABLED` | `true` | Enable manual verification |
+
+### MC Gateway Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKEND_URL` | `http://127.0.0.1:3000` | Backend service address |
+| `BRIDGE_JWT_SECRET` | *(required)* | Must match backend |
+| `JWT_EXPIRES_IN` | `2h` | Bridge JWT expiration |
+| `GATEWAY_PORT` | `8000` | MC WebSocket listen port |
+| `DEBUG` | `false` | Debug logging |
+
+### Frontend Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_BACKEND_URL` | *(empty)* | Explicit backend URL. Leave empty to use Vite proxy |
+
+## Development
+
+### Running Tests
+
+```bash
+cd backend && npm test
+cd mcwss && npm test
+cd frontend && npm test
+cd shared && npm test
+```
+
+### Code Style
+
+```bash
+cd frontend && npm run lint
+cd mcwss && npm run lint
+```
+
+This project uses **ESLint** + **Prettier** for code formatting.
+
+## Troubleshooting
+
+### Gateway fails to connect to backend
+
+1. Verify backend is running: `curl http://localhost:3000/healthz`
+2. Check `BRIDGE_JWT_SECRET` matches in both `.env` files
+3. Verify `BACKEND_URL` is correct in `mcwss/.env`
+
+### Environment variables not taking effect
+
+Ensure `.env` files are in the correct package directories (`backend/.env`, `mcwss/.env`).
+
+### Port already in use
+
+Change ports in `.env`:
 - Backend: `PORT=3001`
-- MC 网关: `GATEWAY_PORT=8001`
+- MC Gateway: `GATEWAY_PORT=8001`
 
-## 技术栈
+### WebRTC audio not working across networks
 
-- **Backend**: Node.js + Express + Socket.io + TypeScript
-- **MC 网关**: Node.js + ws + Socket.io-client + TypeScript
-- **Frontend**: React + Vite + TypeScript
-- **共享模块**: TypeScript 类型定义
-- **测试**: Vitest
+Configure TURN servers in `backend/.env`:
 
-## 开发规范
+```bash
+ICE_SERVERS=[{"urls":"turn:your-turn-server.com:3478","username":"user","credential":"pass"}]
+```
 
-详见 [CLAUDE.md](./CLAUDE.md)。
+## Tech Stack
+
+| Package | Technologies |
+|---------|-------------|
+| **Backend** | Node.js, Express 5, Socket.IO 4, TypeScript |
+| **MC Gateway** | Node.js, ws, Socket.IO client, TypeScript |
+| **Frontend** | React 19, Vite 7, Socket.IO client, WebRTC, TypeScript |
+| **Shared** | TypeScript type definitions |
+| **Testing** | Vitest |
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## License
+
+[MIT](./LICENSE) © 小礼

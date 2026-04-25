@@ -1,28 +1,21 @@
-# MCBEWebRTC（MC WebSocket + WebRTC 距离语音）
+# Demo (Legacy Reference)
 
-## 运行
+> **Deprecated:** This directory contains the original proof-of-concept implementation. It uses a different architecture (raw ws + JSON) and is NOT compatible with the current mainline packages.
+>
+> For the current implementation, see:
+> - [Backend](../backend/README.md)
+> - [MC Gateway](../mcwss/README.md)
+> - [Frontend](../frontend/README.md)
 
-- 启动信令服务：`npm run start`（默认 `http://localhost:3000`，WS 路径 `/ws`）
-- 启动 MC 网关：`npm run start:gateway`（默认监听 `8000`，游戏内用 `/connect localhost:8000`）
+## Running
 
-## 环境变量
+This demo is kept for behavior reference and regression testing only.
 
-- `APP_PORT`：信令 HTTP 端口（默认 `3000`）
-- `WS_PATH`：信令 WS 路径（默认 `/ws`）
-- `CALL_RADIUS`：附近判断半径（默认 `10`）
-- `PROXIMITY_TICK_MS`：附近列表计算周期（默认 `250`）
-- `GAME_PLAYER_TTL_MS`：位置数据过期时间（默认 `10000`）
-- `MCBEWEBRTC_TOKEN`：网关认证 token（建议设置；信令与网关需一致）
+```bash
+cd demo
+npm install
+npm run start        # Start signaling server (ws://localhost:3000/ws)
+npm run start:gateway # Start MC gateway (ws://localhost:8000)
+```
 
-### TURN（跨公网/NAT 建议必配）
-
-- `ICE_SERVERS_JSON`：直接传完整 ICE servers 数组 JSON（优先级最高）
-- 或使用：
-  - `STUN_URLS`：逗号分隔 STUN（默认 `stun:stun.l.google.com:19302`）
-  - `TURN_URL` / `TURN_USERNAME` / `TURN_CREDENTIAL`
-
-## 同名重连（校验码）
-
-- 若同名已在线，网页会被拒绝并提示。
-- 若 MC 网关在线，服务端会尝试向游戏内发送校验码（`tell "<玩家名>" <校验码>`）。
-- 重新连接时，在输入框使用：`玩家名#校验码`。
+Open `http://localhost:3000` for the demo interface.

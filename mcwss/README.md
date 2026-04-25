@@ -1,29 +1,62 @@
 # @mcbewebrtc/mcwss
 
-Minecraft WebSocket 网关（TypeScript + Socket.io client），负责将游戏侧 `PlayerTransform` 上报到 `backend`。
+[← Back to Root](../README.md)
 
-## 开发
+Minecraft Bedrock WebSocket gateway. Receives `PlayerTransform` events from MC clients and bridges them to the backend signaling server via Socket.IO.
+
+## Quick Start
 
 ```bash
 npm install
+cp .env.example .env   # Set BRIDGE_JWT_SECRET (must match backend)
 npm run dev
 ```
 
-默认监听：`ws://0.0.0.0:8000`
+Default: `ws://0.0.0.0:8000`
 
-## 构建与启动
+## Scripts
 
-```bash
-npm run build
-npm run start
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start in development mode (tsx watch) |
+| `npm run build` | Compile TypeScript |
+| `npm run start` | Start compiled server |
+| `npm test` | Run Vitest test suite |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Check Prettier formatting |
+| `npm run format:fix` | Fix Prettier formatting |
+
+## Connecting in Minecraft
+
+In Minecraft Bedrock Edition, enable WebSocket and run:
+
+```
+/connect localhost:8000
 ```
 
-## 环境变量
+## Project Structure
 
-- `BACKEND_URL`：后端地址（默认 `http://127.0.0.1:3000`）
-- `BRIDGE_JWT_SECRET`：桥接 JWT 签名密钥（需与 backend 一致）
-- `JWT_EXPIRES_IN`：桥接 JWT 有效期（默认 `2h`，示例：`30m`/`2h`/`1d`）
-- `GATEWAY_PORT`：网关监听端口（默认 `8000`）
-- `DEBUG`：调试日志开关（`true/false`）
+```
+src/
+├── config/                  # Environment configuration
+├── services/command/        # Command handlers
+│   ├── manualAuthWatcher.ts # Monitor chat for manual verification codes
+│   └── sendTellCommand.ts   # Send /tell messages to players
+├── utils/                   # JWT utilities
+├── main.ts                  # Entry point
+├── mcGateway.ts             # MC WebSocket server
+├── signalingBridge.ts       # Socket.IO bridge to backend
+└── types.ts                 # Type definitions
+```
 
-可参考 `.env.example`。
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BACKEND_URL` | `http://127.0.0.1:3000` | Backend service address |
+| `BRIDGE_JWT_SECRET` | *(required)* | Must match backend |
+| `JWT_EXPIRES_IN` | `2h` | Bridge JWT expiration |
+| `GATEWAY_PORT` | `8000` | MC WebSocket listen port |
+| `DEBUG` | `false` | Debug logging |
+
+See `.env.example` for reference.
