@@ -1,3 +1,4 @@
+import cors from "cors";
 import express, { type Express } from "express";
 import type { IceServerDto } from "../config/readConfig.js";
 import { createIceRouter } from "./routes/ice.js";
@@ -17,6 +18,8 @@ export interface CreateAppInput {
 export function createApp(input: CreateAppInput): Express {
   const app = express();
 
+  // 允许跨域请求，前端开发及部署时可能直接访问后端地址
+  app.use(cors());
   app.use(express.json());
   app.use("/api", createIceRouter({ iceServers: input.iceServers }));
 
