@@ -1,0 +1,48 @@
+# 版本控制
+.git
+.gitignore
+.github
+
+# 编辑器和 IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Claude Code 配置
+.claude
+
+# Git worktrees
+.worktrees
+
+# 旧版参考实现（不需要参与构建）
+demo/
+
+# 各子包构建产物（Docker 内重新构建）
+backend/dist
+mcwss/dist
+frontend/dist
+shared/dist
+
+# 各子包 node_modules（Docker 内重新安装）
+backend/node_modules
+mcwss/node_modules
+frontend/node_modules
+shared/node_modules
+
+# 文档（不需要在构建镜像中）
+docs
+*.md
+!backend/package.json
+!mcwss/package.json
+!frontend/package.json
+!shared/package.json
+
+# 贡献指南
+CONTRIBUTING.md
+
+# 环境变量文件（不打包进镜像，运行时通过 env_file 注入）
+backend/.env
+mcwss/.env
+frontend/.env
+.env

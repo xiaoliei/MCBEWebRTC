@@ -108,6 +108,22 @@ cd mcwss && npm run build && npm run start
 cd frontend && npm run build  # 静态文件输出到 frontend/dist/
 ```
 
+**Docker 部署：**
+
+```bash
+# 开发环境（支持热重载）
+docker compose up --build
+
+# 生产环境
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# 生产环境停止
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+```
+
+> 使用 Docker 时，仍需在各子包目录准备 `.env` 文件（参考上方"配置环境变量"步骤）。
+> 确保 `backend/.env` 和 `mcwss/.env` 中的 `BRIDGE_JWT_SECRET` 一致。
+
 ### 4. 在 Minecraft 中连接
 
 在我的世界基岩版中，启用 WebSocket 并连接到网关：

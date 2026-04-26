@@ -1,0 +1,42 @@
+# MCBEWebRTC 开发环境覆盖配置
+# 此文件由 docker compose 自动加载（无需显式指定 -f）
+# 使用 builder target（包含完整 devDependencies 和 tsx），通过卷挂载实现热重载
+
+services:
+  backend:
+    build:
+      target: builder
+    ports:
+      - "3000:3000"
+    volumes:
+      # 挂载源码实现热重载（覆盖构建阶段的编译产物）
+      - ./backend/src:/app/backend/src
+      - ./shared/src:/app/shared/src
+    command: npx tsx watch backend/src/server.ts
+    environment:
+      - NODE_ENV=development
+
+  mcwss:
+    build:
+      target: builder
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcwss/src:/app/mcwss/src
+      - ./shared/src:/app/shared/src
+    command: npx tsx watch mcwss/src/main.ts
+    environment:
+      - NODE_ENV=development
+
+  frontend:
+    build:
+      target: builder
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/frontend/src
+      - ./shared/src:/app/shared/src
+    command: npx vite --host 0.0.0.0 --port 5173
+    environment:
+      # 开发模式下浏览器直接访问宿主机的 backend 端口
+      - VITE_BACKEND_URL=http://localhost:3000

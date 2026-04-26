@@ -108,6 +108,22 @@ cd mcwss && npm run build && npm run start
 cd frontend && npm run build  # Static files in frontend/dist/
 ```
 
+**Docker deployment:**
+
+```bash
+# Development (with hot reload)
+docker compose up --build
+
+# Production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# Stop production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+```
+
+> When using Docker, you still need `.env` files in each subpackage directory (see "Configure environment variables" above).
+> Ensure `BRIDGE_JWT_SECRET` is identical in both `backend/.env` and `mcwss/.env`.
+
 ### 4. Connect in Minecraft
 
 In Minecraft Bedrock Edition, enable WebSocket and connect to the gateway:

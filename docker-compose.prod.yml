@@ -1,0 +1,33 @@
+# MCBEWebRTC 生产环境覆盖配置
+# 需与 docker-compose.yml 配合使用（跳过 override）：
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 核心变更：
+#   - 使用 production 多阶段构建 target，生成精简镜像
+#   - backend 端口不直接暴露，通过 frontend 的 nginx 代理访问
+#   - mcwss 端口暴露给外部 Minecraft 客户端连接
+#   - frontend 使用 nginx 托管构建产物，对外暴露 80 端口
+
+services:
+  backend:
+    build:
+      target: production
+    restart: unless-stopped
+
+  mcwss:
+    build:
+      target: production
+    ports:
+      # mcwss 端口需要暴露给外部 MC 客户端连接
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      target: production
+    ports:
+      # nginx 对外暴露 80 端口
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
