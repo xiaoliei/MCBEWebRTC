@@ -90,12 +90,12 @@ export function createSocketServer(input: CreateSocketServerInput): SocketServer
     callRadius: input.options.callRadius,
     tickMs: input.options.tickMs,
     gamePlayerTtlMs: input.options.gamePlayerTtlMs,
-    emitNearby: (sessionId, nearbyPlayers) => {
+    emitNearby: (sessionId, nearbyPlayers, myPosition) => {
       const targetSocketId = socketIdBySessionId.get(sessionId);
       if (!targetSocketId) {
         return;
       }
-      io.to(targetSocketId).emit("presence:nearby", { players: nearbyPlayers });
+      io.to(targetSocketId).emit("presence:nearby", { players: nearbyPlayers, myPosition });
     },
   });
 

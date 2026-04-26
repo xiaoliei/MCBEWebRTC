@@ -36,4 +36,15 @@ describe('fetchIceServers', () => {
 
     expect(servers[0].urls).toBe('stun:stun.l.google.com:19302');
   });
+
+  it('测试模式下默认 fetch 会直接回退默认 STUN', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const servers = await fetchIceServers();
+
+    expect(servers[0].urls).toBe('stun:stun.l.google.com:19302');
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
 });

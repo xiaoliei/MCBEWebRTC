@@ -70,7 +70,8 @@ describe('WebRTCConnectionManager', () => {
       getLocalStream: vi.fn().mockReturnValue(null),
       playRemoteStream: vi.fn(),
       stopRemoteStream: vi.fn(),
-      cleanup: vi.fn()
+      cleanup: vi.fn(),
+      updateRemoteVolume: vi.fn()
     };
     const signalOut = {
       sendOffer: vi.fn(),
@@ -106,7 +107,8 @@ describe('WebRTCConnectionManager', () => {
       getLocalStream: vi.fn().mockReturnValue(null),
       playRemoteStream: vi.fn(),
       stopRemoteStream: vi.fn(),
-      cleanup: vi.fn()
+      cleanup: vi.fn(),
+      updateRemoteVolume: vi.fn()
     };
     const signalOut = {
       sendOffer: vi.fn(),
@@ -152,7 +154,8 @@ describe('WebRTCConnectionManager', () => {
       getLocalStream: vi.fn().mockReturnValue(null),
       playRemoteStream: vi.fn(),
       stopRemoteStream: vi.fn(),
-      cleanup: vi.fn()
+      cleanup: vi.fn(),
+      updateRemoteVolume: vi.fn()
     };
     const signalOut = {
       sendOffer: vi.fn(),

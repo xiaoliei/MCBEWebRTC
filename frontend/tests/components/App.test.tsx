@@ -161,7 +161,8 @@ describe('App MVP flow', () => {
           position: { x: 1, y: 1, z: 1 },
           dim: 0
         }
-      ]
+      ],
+      myPosition: null
     });
 
     await waitFor(() => {

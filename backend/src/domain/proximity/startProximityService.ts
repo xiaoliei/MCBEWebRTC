@@ -18,7 +18,11 @@ export interface StartProximityServiceOptions {
   callRadius: number;
   tickMs: number;
   gamePlayerTtlMs: number;
-  emitNearby: (sessionId: string, nearbyPlayers: NearbyPlayerItem[]) => void;
+  emitNearby: (
+    sessionId: string,
+    nearbyPlayers: NearbyPlayerItem[],
+    myPosition: Vector3 | null,
+  ) => void;
   nowProvider?: () => number;
 }
 
@@ -51,7 +55,6 @@ export function startProximityService(
   options: StartProximityServiceOptions,
 ): () => void {
   const radiusSquared = options.callRadius * options.callRadius;
-  const lastSentKeyBySessionId = new Map<string, string>();
   const nowProvider = options.nowProvider ?? (() => Date.now());
 
   const timer = setInterval(() => {
@@ -60,6 +63,10 @@ export function startProximityService(
 
     const sessions = options.sessionStore.listOnlineSessions();
     for (const session of sessions) {
+      // 获取本玩家位置，用于前端距离衰减计算
+      const selfPlayer = options.stateStore.getPlayerByName(session.playerName);
+      const myPosition = selfPlayer?.position ?? null;
+
       const nearbyPlayers = collectNearbyPlayers({
         session,
         sessions,
@@ -67,14 +74,8 @@ export function startProximityService(
         radiusSquared,
       });
 
-      const nextKey = nearbyPlayers.map((item) => item.sessionId).join(",");
-      if (lastSentKeyBySessionId.get(session.sessionId) === nextKey) {
-        continue;
-      }
-
-      // 仅在邻近列表变化时推送，避免高频无效消息。
-      lastSentKeyBySessionId.set(session.sessionId, nextKey);
-      options.emitNearby(session.sessionId, nearbyPlayers);
+      // 每次 tick 都推送，包含本玩家位置，供前端计算音量衰减
+      options.emitNearby(session.sessionId, nearbyPlayers, myPosition);
     }
   }, options.tickMs);
 

@@ -76,7 +76,7 @@ describe("startProximityService", () => {
     stop();
   });
 
-  it("邻近列表不变化时不会重复推送", () => {
+  it("每次 tick 都推送附近玩家信息", () => {
     const stateStore = new StateStore();
     const sessionStore = new SessionStore();
     const emitNearby = vi.fn();
@@ -115,11 +115,100 @@ describe("startProximityService", () => {
       emitNearby,
     });
 
+    // 第一次 tick
     vi.advanceTimersByTime(120);
     const firstCount = emitNearby.mock.calls.length;
+    expect(firstCount).toBeGreaterThan(0);
 
+    // 第二次 tick，玩家位置未变化，但仍然应该推送
     vi.advanceTimersByTime(500);
-    expect(emitNearby.mock.calls.length).toBe(firstCount);
+    expect(emitNearby.mock.calls.length).toBeGreaterThan(firstCount);
+
+    stop();
+  });
+
+  it("emitNearby 应携带本玩家位置作为 myPosition", () => {
+    const stateStore = new StateStore();
+    const sessionStore = new SessionStore();
+    const emitNearby = vi.fn();
+
+    sessionStore.createSession({
+      sessionId: "s1",
+      playerName: "A",
+      socketId: "sock-a",
+      connectedAt: Date.now(),
+    });
+    sessionStore.createSession({
+      sessionId: "s2",
+      playerName: "B",
+      socketId: "sock-b",
+      connectedAt: Date.now(),
+    });
+    stateStore.upsertPlayer({
+      playerName: "A",
+      position: { x: 10, y: 5, z: -3 },
+      dim: 0,
+      now: Date.now(),
+    });
+    stateStore.upsertPlayer({
+      playerName: "B",
+      position: { x: 12, y: 5, z: -3 },
+      dim: 0,
+      now: Date.now(),
+    });
+
+    const stop = startProximityService({
+      stateStore,
+      sessionStore,
+      callRadius: 5,
+      tickMs: 100,
+      gamePlayerTtlMs: 10_000,
+      emitNearby,
+    });
+
+    vi.advanceTimersByTime(120);
+
+    const emitForA = emitNearby.mock.calls.find((call) => call[0] === "s1");
+    expect(emitForA).toBeTruthy();
+    // 第三参数是 myPosition
+    expect(emitForA?.[2]).toEqual({ x: 10, y: 5, z: -3 });
+
+    stop();
+  });
+
+  it("本玩家无位置数据时 myPosition 为 null", () => {
+    const stateStore = new StateStore();
+    const sessionStore = new SessionStore();
+    const emitNearby = vi.fn();
+
+    sessionStore.createSession({
+      sessionId: "s1",
+      playerName: "A",
+      socketId: "sock-a",
+      connectedAt: Date.now(),
+    });
+    sessionStore.createSession({
+      sessionId: "s2",
+      playerName: "B",
+      socketId: "sock-b",
+      connectedAt: Date.now(),
+    });
+    // 不为 A 设置位置数据
+
+    const stop = startProximityService({
+      stateStore,
+      sessionStore,
+      callRadius: 5,
+      tickMs: 100,
+      gamePlayerTtlMs: 10_000,
+      emitNearby,
+    });
+
+    vi.advanceTimersByTime(120);
+
+    const emitForA = emitNearby.mock.calls.find((call) => call[0] === "s1");
+    expect(emitForA).toBeTruthy();
+    expect(emitForA?.[2]).toBeNull();
 
     stop();
   });

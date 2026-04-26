@@ -349,6 +349,11 @@ export function createSignalingService(
         nearbyPlayers: payload.players
       }));
       handleNearbyPlayersUpdate(payload.players);
+
+      // 根据位置更新所有在线连接的音量
+      if (manager) {
+        manager.updateVolumes(payload.myPosition, payload.players);
+      }
     })
   );
 

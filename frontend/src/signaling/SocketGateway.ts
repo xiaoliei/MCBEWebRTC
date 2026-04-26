@@ -1,9 +1,9 @@
-import type { NearbyPlayerDto, ConnectDeniedPayload, WebRtcSignalRelayPayload } from '@mcbewebrtc/shared';
+import type { NearbyPlayerDto, ConnectDeniedPayload, WebRtcSignalRelayPayload, PositionDto } from '@mcbewebrtc/shared';
 
 export type GatewayEventMap = {
   connected: { sessionId: string; playerName: string };
   'connect:denied': ConnectDeniedPayload;
-  'presence:nearby': { players: NearbyPlayerDto[] };
+  'presence:nearby': { players: NearbyPlayerDto[]; myPosition: PositionDto | null };
   'webrtc:offer': WebRtcSignalRelayPayload;
   'webrtc:answer': WebRtcSignalRelayPayload;
   'webrtc:candidate': WebRtcSignalRelayPayload;

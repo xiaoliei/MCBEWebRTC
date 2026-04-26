@@ -17,6 +17,13 @@ export async function fetchIceServers(
 
   try {
     const backendUrl = String(import.meta.env.VITE_BACKEND_URL ?? '').trim();
+    // 中文注释：Vitest 环境下如果没有注入后端地址，默认 fetch 会把相对 URL 解析失败。
+    // 这种情况下直接回退默认 STUN，避免测试噪音，同时不影响显式传入 fetcher 的单测。
+    if (!backendUrl && import.meta.env.MODE === 'test' && fetcher === fetch) {
+      cachedIceServers = FALLBACK_STUN;
+      return FALLBACK_STUN;
+    }
+
     // 中文注释：未配置后端地址时走相对路径，配合 Vite 代理进行本地联调。
     const requestUrl = backendUrl ? `${backendUrl}/api/ice` : '/api/ice';
 

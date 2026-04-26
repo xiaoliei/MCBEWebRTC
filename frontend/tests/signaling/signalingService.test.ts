@@ -92,7 +92,8 @@ describe('createSignalingService', () => {
           position: { x: 1, y: 2, z: 3 },
           dim: 0
         }
-      ]
+      ],
+      myPosition: null
     });
 
     expect(service.getState().status).toBe('connected');
@@ -196,7 +197,8 @@ describe('createSignalingService', () => {
           position: { x: 1, y: 2, z: 3 },
           dim: 0
         }
-      ]
+      ],
+      myPosition: null
     });
 
     service.disconnect();
@@ -215,7 +217,7 @@ describe('createSignalingService', () => {
     service.join('Alice');
     gateway.emit('connected', { sessionId: 's-1', playerName: 'Alice' });
     unsub();
-    gateway.emit('presence:nearby', { players: [] });
+    gateway.emit('presence:nearby', { players: [], myPosition: null });
 
     expect(listener).toHaveBeenCalled();
     expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -236,7 +238,8 @@ describe('createSignalingService', () => {
           position: { x: 1, y: 2, z: 3 },
           dim: 0
         }
-      ]
+      ],
+      myPosition: null
     });
 
     expect(service.getState().sessionId).toBe('s-1');

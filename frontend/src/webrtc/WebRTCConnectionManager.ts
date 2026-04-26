@@ -1,5 +1,6 @@
 import type { NearbyPlayerDto } from '@mcbewebrtc/shared';
 import type { IAudioService } from '../audio/IAudioService';
+import { calculateVolume } from '../audio/calculateVolume.js';
 import { PeerConnection } from './PeerConnection';
 
 export interface ConnectionState {
@@ -132,6 +133,40 @@ export class WebRTCConnectionManager {
       if (shouldConnect) {
         void this.connectTo(player.sessionId, player.playerName);
       }
+    });
+  }
+
+  /**
+   * 根据本玩家位置和附近玩家列表，计算每个在线连接的音量并更新
+   * @param myPosition 本玩家位置，null 时所有连接音量设为 1.0
+   * @param players 附近玩家列表
+   */
+  updateVolumes(
+    myPosition: { x: number; y: number; z: number } | null,
+    players: NearbyPlayerDto[],
+  ): void {
+    this.connections.forEach((_peer, sessionId) => {
+      if (!myPosition) {
+        // 本玩家位置未知（浏览器端客户端），不衰减
+        this.audioService.updateRemoteVolume(sessionId, 1.0);
+        return;
+      }
+
+      const player = players.find((p) => p.sessionId === sessionId);
+      if (!player) {
+        // 该连接的玩家不在附近列表中，保持静默
+        return;
+      }
+
+      // 计算 3D 欧几里得距离
+      const dx = myPosition.x - player.position.x;
+      const dy = myPosition.y - player.position.y;
+      const dz = myPosition.z - player.position.z;
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      // 使用 1/r 反比例曲线计算音量
+      const volume = calculateVolume(distance);
+      this.audioService.updateRemoteVolume(sessionId, volume);
     });
   }
 
