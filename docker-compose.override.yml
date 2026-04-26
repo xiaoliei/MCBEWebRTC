@@ -6,31 +6,34 @@ services:
   backend:
     build:
       target: builder
+    working_dir: /app/backend
     ports:
       - "3000:3000"
     volumes:
       # 挂载源码实现热重载（覆盖构建阶段的编译产物）
       - ./backend/src:/app/backend/src
       - ./shared/src:/app/shared/src
-    command: npx tsx watch backend/src/server.ts
+    command: npx tsx watch src/server.ts
     environment:
       - NODE_ENV=development
 
   mcwss:
     build:
       target: builder
+    working_dir: /app/mcwss
     ports:
       - "8000:8000"
     volumes:
       - ./mcwss/src:/app/mcwss/src
       - ./shared/src:/app/shared/src
-    command: npx tsx watch mcwss/src/main.ts
+    command: npx tsx watch src/main.ts
     environment:
       - NODE_ENV=development
 
   frontend:
     build:
       target: builder
+    working_dir: /app/frontend
     ports:
       - "5173:5173"
     volumes:
